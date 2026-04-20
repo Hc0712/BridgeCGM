@@ -13,6 +13,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import tw.yourcompany.cgmbridge.core.config.FeatureFlags
 import tw.yourcompany.cgmbridge.feature.keepalive.NotificationPollScheduler
+import tw.yourcompany.cgmbridge.feature.alarm.AlarmReplayScheduler
 import tw.yourcompany.cgmbridge.core.logging.DebugCategory
 import tw.yourcompany.cgmbridge.core.logging.DebugTrace
 import tw.yourcompany.cgmbridge.feature.keepalive.DatabaseMaintenanceWorker
@@ -78,5 +79,9 @@ class BridgeCGMApplication : Application() {
         // NotificationListenerService is still alive.
         // Reference: xDrip+ Notifications.scheduleWakeup() + DoNothingService.setFailOverTimer()
         NotificationPollScheduler.schedule(this)
+
+        // Rebuild any active glucose reminder replay alarms that were persisted
+        // before the process was killed or the app was restarted.
+        AlarmReplayScheduler.rescheduleFromPrefs(this)
     }
 }

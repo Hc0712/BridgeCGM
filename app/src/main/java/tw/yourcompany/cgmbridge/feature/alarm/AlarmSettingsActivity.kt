@@ -9,11 +9,18 @@ import androidx.activity.addCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import tw.yourcompany.cgmbridge.R
-import tw.yourcompany.cgmbridge.databinding.ActivityAlarmSettingsBinding
-import tw.yourcompany.cgmbridge.feature.alarm.AlarmSoundPlayer
 import tw.yourcompany.cgmbridge.core.prefs.AppPrefs
+import tw.yourcompany.cgmbridge.databinding.ActivityAlarmSettingsBinding
 import java.util.Locale
 
+/**
+ * Reminder Setting screen.
+ *
+ * Important behavioral contract required by this task:
+ *  - tapping threshold / method / interval / duration rows must NEVER play alarm;
+ *  - switching an alarm OFF must stop playback and clear its runtime state;
+ *  - switching an alarm ON must play that alarm sound exactly once.
+ */
 class AlarmSettingsActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityAlarmSettingsBinding
@@ -24,6 +31,8 @@ class AlarmSettingsActivity : AppCompatActivity() {
         const val DEFAULT_MAX_MGDL = 250.0
     }
 
+    private var suppressSwitchCallback = false
+
     private fun maybeWarnMutedAlarmVolume() {
         val am = getSystemService(AudioManager::class.java) ?: return
         if (am.getStreamVolume(AudioManager.STREAM_ALARM) == 0) {
@@ -31,19 +40,14 @@ class AlarmSettingsActivity : AppCompatActivity() {
         }
     }
 
-    private fun playHighPreview() {
+    /** Plays exactly one manual confirmation sound when the user turns an alarm ON. */
+    private fun playManualEnableSound(kind: AlarmKind) {
         maybeWarnMutedAlarmVolume()
-        AlarmSoundPlayer.playByName(this, "high", prefs.alarmHighDurationSec)
-    }
-
-    private fun playLowPreview() {
-        maybeWarnMutedAlarmVolume()
-        AlarmSoundPlayer.playByName(this, "low", prefs.alarmLowDurationSec)
-    }
-
-    private fun playUrgentPreview() {
-        maybeWarnMutedAlarmVolume()
-        AlarmSoundPlayer.playByName(this, "urgent", prefs.alarmUrgentLowDurationSec)
+        when (kind) {
+            AlarmKind.HIGH -> AlarmSoundPlayer.playByName(this, "high", prefs.alarmHighDurationSec)
+            AlarmKind.LOW -> AlarmSoundPlayer.playByName(this, "low", prefs.alarmLowDurationSec)
+            AlarmKind.URGENT_LOW -> AlarmSoundPlayer.playByName(this, "urgent", prefs.alarmUrgentLowDurationSec)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -63,12 +67,21 @@ class AlarmSettingsActivity : AppCompatActivity() {
     private fun bindViews() {
         binding.btnBack.setOnClickListener { saveAndFinish() }
 
-        binding.switchHigh.setOnCheckedChangeListener { _, isChecked -> prefs.alarmHighEnabled = isChecked }
-        binding.switchLow.setOnCheckedChangeListener { _, isChecked -> prefs.alarmLowEnabled = isChecked }
-        binding.switchUrgentLow.setOnCheckedChangeListener { _, isChecked -> prefs.alarmUrgentLowEnabled = isChecked }
+        binding.switchHigh.setOnCheckedChangeListener { _, isChecked ->
+            if (suppressSwitchCallback) return@setOnCheckedChangeListener
+            handleEnableToggle(AlarmKind.HIGH, isChecked)
+        }
+        binding.switchLow.setOnCheckedChangeListener { _, isChecked ->
+            if (suppressSwitchCallback) return@setOnCheckedChangeListener
+            handleEnableToggle(AlarmKind.LOW, isChecked)
+        }
+        binding.switchUrgentLow.setOnCheckedChangeListener { _, isChecked ->
+            if (suppressSwitchCallback) return@setOnCheckedChangeListener
+            handleEnableToggle(AlarmKind.URGENT_LOW, isChecked)
+        }
 
+        // IMPORTANT: row clicks only edit values. They must never play sound.
         binding.rowHighThreshold.setOnClickListener {
-            playHighPreview()
             val isMmol = prefs.outputUnit == "mmol"
             val min = if (isMmol) 140.0 / MMOL_FACTOR else 140.0
             val max = if (isMmol) DEFAULT_MAX_MGDL / MMOL_FACTOR else DEFAULT_MAX_MGDL
@@ -77,22 +90,18 @@ class AlarmSettingsActivity : AppCompatActivity() {
                 renderAll()
             }
         }
-
         binding.rowHighMethod.setOnClickListener {
-            playHighPreview()
             prefs.alarmHighMethod = "sound"
             Toast.makeText(this, getString(R.string.alarm_future_work), Toast.LENGTH_SHORT).show()
             renderAll()
         }
         binding.rowHighInterval.setOnClickListener {
-            playHighPreview()
             showIntInput(getString(R.string.alarm_reminder_interval), prefs.alarmHighIntervalMin, 1, 1440) {
                 prefs.alarmHighIntervalMin = it
                 renderAll()
             }
         }
         binding.rowHighDuration.setOnClickListener {
-            playHighPreview()
             showIntInput(getString(R.string.alarm_alert_duration), prefs.alarmHighDurationSec, 1, 120) {
                 prefs.alarmHighDurationSec = it
                 renderAll()
@@ -100,7 +109,6 @@ class AlarmSettingsActivity : AppCompatActivity() {
         }
 
         binding.rowLowThreshold.setOnClickListener {
-            playLowPreview()
             val isMmol = prefs.outputUnit == "mmol"
             val min = if (isMmol) 54.0 / MMOL_FACTOR else 54.0
             val max = if (isMmol) 108.0 / MMOL_FACTOR else 108.0
@@ -111,7 +119,6 @@ class AlarmSettingsActivity : AppCompatActivity() {
             }
         }
         binding.rowUrgentLowThreshold.setOnClickListener {
-            playUrgentPreview()
             val isMmol = prefs.outputUnit == "mmol"
             val minMgdl = 39.0
             val maxMgdl = minOf(prefs.dLowBlood, 80.0)
@@ -122,38 +129,31 @@ class AlarmSettingsActivity : AppCompatActivity() {
                 renderAll()
             }
         }
-
         binding.rowLowMethod.setOnClickListener {
-            playLowPreview()
             Toast.makeText(this, getString(R.string.alarm_future_work), Toast.LENGTH_SHORT).show()
         }
         binding.rowUrgentLowMethod.setOnClickListener {
-            playUrgentPreview()
             Toast.makeText(this, getString(R.string.alarm_future_work), Toast.LENGTH_SHORT).show()
         }
         binding.rowLowInterval.setOnClickListener {
-            playLowPreview()
             showIntInput(getString(R.string.alarm_reminder_interval), prefs.alarmLowIntervalMin, 1, 1440) {
                 prefs.alarmLowIntervalMin = it
                 renderAll()
             }
         }
         binding.rowLowDuration.setOnClickListener {
-            playLowPreview()
             showIntInput(getString(R.string.alarm_alert_duration), prefs.alarmLowDurationSec, 1, 120) {
                 prefs.alarmLowDurationSec = it
                 renderAll()
             }
         }
         binding.rowUrgentLowInterval.setOnClickListener {
-            playUrgentPreview()
             showIntInput(getString(R.string.alarm_reminder_interval), prefs.alarmUrgentLowIntervalMin, 1, 1440) {
                 prefs.alarmUrgentLowIntervalMin = it
                 renderAll()
             }
         }
         binding.rowUrgentLowDuration.setOnClickListener {
-            playUrgentPreview()
             showIntInput(getString(R.string.alarm_alert_duration), prefs.alarmUrgentLowDurationSec, 1, 120) {
                 prefs.alarmUrgentLowDurationSec = it
                 renderAll()
@@ -161,10 +161,48 @@ class AlarmSettingsActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Handles the exact workflow required for the On/Off switches.
+     *
+     * OFF:
+     *  - persist disabled state
+     *  - stop any currently playing audio
+     *  - clear the corresponding replay timer and runtime state
+     *
+     * ON:
+     *  - persist enabled state
+     *  - play one immediate confirmation sound
+     *  - do not mark the alarm active here; the glucose evaluator owns that state
+     */
+    private fun handleEnableToggle(kind: AlarmKind, enabled: Boolean) {
+        when (kind) {
+            AlarmKind.HIGH -> prefs.alarmHighEnabled = enabled
+            AlarmKind.LOW -> prefs.alarmLowEnabled = enabled
+            AlarmKind.URGENT_LOW -> prefs.alarmUrgentLowEnabled = enabled
+        }
+        if (enabled) {
+            playManualEnableSound(kind)
+        } else {
+            val rule = when (kind) {
+                AlarmKind.HIGH -> AlarmConfig.high(prefs)
+                AlarmKind.LOW -> AlarmConfig.low(prefs)
+                AlarmKind.URGENT_LOW -> AlarmConfig.urgentLow(prefs)
+            }
+            ReminderAlertEvaluator.clearOne(this, prefs, rule)
+            AlarmSoundPlayer.stop()
+        }
+        renderAll()
+    }
+
     private fun renderAll() {
-        binding.switchHigh.isChecked = prefs.alarmHighEnabled
-        binding.switchLow.isChecked = prefs.alarmLowEnabled
-        binding.switchUrgentLow.isChecked = prefs.alarmUrgentLowEnabled
+        suppressSwitchCallback = true
+        try {
+            binding.switchHigh.isChecked = prefs.alarmHighEnabled
+            binding.switchLow.isChecked = prefs.alarmLowEnabled
+            binding.switchUrgentLow.isChecked = prefs.alarmUrgentLowEnabled
+        } finally {
+            suppressSwitchCallback = false
+        }
         binding.tvHighThresholdValue.text = formatGlucoseValue(prefs.dHighBlood)
         binding.tvLowThresholdValue.text = formatGlucoseValue(prefs.dLowBlood)
         binding.tvUrgentLowThresholdValue.text = formatGlucoseValue(prefs.dUrgentLowBlood)

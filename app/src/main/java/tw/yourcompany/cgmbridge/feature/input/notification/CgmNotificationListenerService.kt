@@ -23,6 +23,7 @@ import tw.yourcompany.cgmbridge.core.prefs.AppPrefs
 import tw.yourcompany.cgmbridge.core.logging.DebugCategory
 import tw.yourcompany.cgmbridge.core.logging.DebugTrace
 import tw.yourcompany.cgmbridge.feature.output.xdrip.XDripBroadcastSender
+import tw.yourcompany.cgmbridge.feature.alarm.ReminderAlertEvaluator
 import tw.yourcompany.cgmbridge.feature.keepalive.NotificationPollScheduler
 
 /**
@@ -295,6 +296,11 @@ class CgmNotificationListenerService : NotificationListenerService() {
                         }
                         XDripBroadcastSender.sendGlucose(applicationContext, broadcastSample)
                         DebugTrace.t(DebugCategory.NOTIFICATION, "BCAST-SENT", "Sent to xDrip NS_EMULATOR dir=$effectiveDir")
+
+                        // Immediately re-evaluate alarm thresholds after each newly inserted reading.
+                        // This removes the old timing gap where reminder playback could be delayed until
+                        // the next watchdog heartbeat instead of firing as soon as the glucose value arrived.
+                        ReminderAlertEvaluator.evaluateAndTrigger(applicationContext)
                     }
                     is BgReadingImporter.ImportResult.IgnoredDuplicate -> {
                         repo.log("D", "Importer", "Duplicate timestamp=${result.timestampMs}")

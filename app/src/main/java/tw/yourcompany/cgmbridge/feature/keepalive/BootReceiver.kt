@@ -14,6 +14,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import tw.yourcompany.cgmbridge.feature.keepalive.NotificationPollScheduler
+import tw.yourcompany.cgmbridge.feature.alarm.AlarmReplayScheduler
 import tw.yourcompany.cgmbridge.feature.keepalive.GuardianServiceLauncher
 import tw.yourcompany.cgmbridge.core.platform.NotificationAccessChecker
 import tw.yourcompany.cgmbridge.feature.keepalive.DatabaseMaintenanceWorker
@@ -82,5 +83,9 @@ class BootReceiver : BroadcastReceiver() {
 
         // Start the AlarmManager heartbeat watchdog.
         NotificationPollScheduler.schedule(context)
+
+        // Restore exact reminder alarms for any glucose alert episode that was
+        // already active before reboot / app update.
+        AlarmReplayScheduler.rescheduleFromPrefs(context)
     }
 }

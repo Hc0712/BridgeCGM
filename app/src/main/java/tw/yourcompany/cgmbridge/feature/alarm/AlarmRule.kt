@@ -33,7 +33,9 @@ data class AlarmRule(
     val intervalMin: Int,
     val durationSec: Int,
     val soundName: String,
-    val lastTriggeredAtMs: Long
+    val lastTriggeredAtMs: Long,
+    val active: Boolean,
+    val nextTriggerAtMs: Long
 ) {
     fun shouldTrigger(latestMgdl: Double): Boolean = when (kind) {
         AlarmKind.HIGH -> latestMgdl >= thresholdMgdl
@@ -52,7 +54,9 @@ object AlarmConfig {
         intervalMin = prefs.alarmHighIntervalMin,
         durationSec = prefs.alarmHighDurationSec,
         soundName = "high",
-        lastTriggeredAtMs = prefs.lastHighAlarmMs
+        lastTriggeredAtMs = prefs.lastHighAlarmMs,
+        active = prefs.highAlarmActive,
+        nextTriggerAtMs = prefs.nextHighAlarmAtMs
     )
 
     fun low(prefs: AppPrefs): AlarmRule = AlarmRule(
@@ -63,7 +67,9 @@ object AlarmConfig {
         intervalMin = prefs.alarmLowIntervalMin,
         durationSec = prefs.alarmLowDurationSec,
         soundName = "low",
-        lastTriggeredAtMs = prefs.lastLowAlarmMs
+        lastTriggeredAtMs = prefs.lastLowAlarmMs,
+        active = prefs.lowAlarmActive,
+        nextTriggerAtMs = prefs.nextLowAlarmAtMs
     )
 
     fun urgentLow(prefs: AppPrefs): AlarmRule = AlarmRule(
@@ -74,7 +80,9 @@ object AlarmConfig {
         intervalMin = prefs.alarmUrgentLowIntervalMin,
         durationSec = prefs.alarmUrgentLowDurationSec,
         soundName = "urgent",
-        lastTriggeredAtMs = prefs.lastUrgentLowAlarmMs
+        lastTriggeredAtMs = prefs.lastUrgentLowAlarmMs,
+        active = prefs.urgentLowAlarmActive,
+        nextTriggerAtMs = prefs.nextUrgentLowAlarmAtMs
     )
 
     fun all(prefs: AppPrefs): List<AlarmRule> = listOf(
@@ -89,5 +97,37 @@ object AlarmConfig {
             AlarmKind.LOW -> prefs.lastLowAlarmMs = timestampMs
             AlarmKind.URGENT_LOW -> prefs.lastUrgentLowAlarmMs = timestampMs
         }
+    }
+
+    /** Persists whether this alarm kind is currently active. */
+    fun persistActive(prefs: AppPrefs, rule: AlarmRule, active: Boolean) {
+        when (rule.kind) {
+            AlarmKind.HIGH -> prefs.highAlarmActive = active
+            AlarmKind.LOW -> prefs.lowAlarmActive = active
+            AlarmKind.URGENT_LOW -> prefs.urgentLowAlarmActive = active
+        }
+    }
+
+    /** Persists the exact wall-clock time when this alarm should replay next. */
+    fun persistNextTriggerAt(prefs: AppPrefs, rule: AlarmRule, timestampMs: Long) {
+        when (rule.kind) {
+            AlarmKind.HIGH -> prefs.nextHighAlarmAtMs = timestampMs
+            AlarmKind.LOW -> prefs.nextLowAlarmAtMs = timestampMs
+            AlarmKind.URGENT_LOW -> prefs.nextUrgentLowAlarmAtMs = timestampMs
+        }
+    }
+
+    /**
+     * Clears all runtime state for this alarm kind.
+     *
+     * We intentionally reset [lastTriggeredAtMs] to zero as well. That way, when
+     * glucose later leaves the normal range again, the first qualifying reading
+     * will alarm immediately instead of being incorrectly rate-limited by the
+     * previous episode's timestamp.
+     */
+    fun clearRuntimeState(prefs: AppPrefs, rule: AlarmRule) {
+        persistActive(prefs, rule, false)
+        persistNextTriggerAt(prefs, rule, 0L)
+        persistLastTriggeredAt(prefs, rule, 0L)
     }
 }

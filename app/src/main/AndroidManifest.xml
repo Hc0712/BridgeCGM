@@ -98,6 +98,12 @@
             android:name=".feature.keepalive.NotificationPollReceiver"
             android:enabled="true"
             android:exported="false" />
+        <!-- Exact replay receiver for glucose reminder intervals (2 min, 5 min, etc.). -->
+        <receiver
+            android:name=".feature.alarm.AlarmReplayReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
 
     </application>
 </manifest>

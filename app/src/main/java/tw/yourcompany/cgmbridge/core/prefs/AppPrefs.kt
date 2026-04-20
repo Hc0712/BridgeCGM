@@ -127,6 +127,48 @@ class AppPrefs(context: Context) {
         get() = sp.getLong("lastUrgentLowAlarmMs", 0L)
         set(value) = sp.edit().putLong("lastUrgentLowAlarmMs", value).apply()
 
+
+    /**
+     * Runtime state flag for the high-glucose alarm.
+     *
+     * Meaning of "active": the latest known glucose value is still inside the
+     * alarm zone, so the alarm engine must continue repeating at the configured
+     * reminder interval until recovery or manual disable.
+     */
+    var highAlarmActive: Boolean
+        get() = sp.getBoolean("highAlarmActive", false)
+        set(value) = sp.edit().putBoolean("highAlarmActive", value).apply()
+
+    /** Same meaning as [highAlarmActive], but for the low-glucose alarm. */
+    var lowAlarmActive: Boolean
+        get() = sp.getBoolean("lowAlarmActive", false)
+        set(value) = sp.edit().putBoolean("lowAlarmActive", value).apply()
+
+    /** Same meaning as [highAlarmActive], but for the urgent-low alarm. */
+    var urgentLowAlarmActive: Boolean
+        get() = sp.getBoolean("urgentLowAlarmActive", false)
+        set(value) = sp.edit().putBoolean("urgentLowAlarmActive", value).apply()
+
+    /**
+     * Absolute epoch timestamp when the next high-glucose replay is due.
+     *
+     * This is stored so the app can re-arm the replay alarm after process death,
+     * app update, or device reboot.
+     */
+    var nextHighAlarmAtMs: Long
+        get() = sp.getLong("nextHighAlarmAtMs", 0L)
+        set(value) = sp.edit().putLong("nextHighAlarmAtMs", value).apply()
+
+    /** Absolute epoch timestamp when the next low-glucose replay is due. */
+    var nextLowAlarmAtMs: Long
+        get() = sp.getLong("nextLowAlarmAtMs", 0L)
+        set(value) = sp.edit().putLong("nextLowAlarmAtMs", value).apply()
+
+    /** Absolute epoch timestamp when the next urgent-low replay is due. */
+    var nextUrgentLowAlarmAtMs: Long
+        get() = sp.getLong("nextUrgentLowAlarmAtMs", 0L)
+        set(value) = sp.edit().putLong("nextUrgentLowAlarmAtMs", value).apply()
+
     fun glucoseForDisplay(mgdl: Double): Double {
         return if (outputUnit == "mmol") mgdl / GlucoseConstants.MMOL_FACTOR else mgdl
     }

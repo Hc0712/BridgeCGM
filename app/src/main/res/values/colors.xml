@@ -1,0 +1,10 @@
+<resources>
+    <color name="bg_screen">#F8DDE2</color>
+    <color name="card_white">#F7F7F7</color>
+    <color name="soft_green">#EAF5E9</color>
+    <color name="danger_red">#C62828</color>
+    <color name="trend_green">#54A047</color>
+    <color name="trend_orange">#D9A441</color>
+    <color name="trend_red">#D14B5B</color>
+    <color name="black">#000000</color>
+</resources>

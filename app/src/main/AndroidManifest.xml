@@ -1,0 +1,103 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Allow restarting services and background scheduling after device reboot or app update. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- Required for posting the foreground service notification on Android 13+. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Required for long-running foreground service operation. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
+    <!-- Lets the app open the official battery optimization exclusion screen. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+    <!-- Optional wake lock permission used by the Android framework for short processing windows. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+
+    <!-- Required for AlarmManager exact alarms on Android 12 (API 31-32). -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
+    <!-- Required for AlarmManager exact alarms on Android 13+ (API 33+). Auto-granted for health apps. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+
+    <application
+        android:name=".feature.keepalive.BridgeCGMApplication"
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.CgmBridge">
+
+        <!-- Main graph screen. -->
+        <activity
+            android:name=".feature.ui.shell.MainActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".feature.ui.shell.SettingsMenuActivity"
+            android:exported="false" />
+        <!-- Mandatory first-launch disclaimer screen. -->
+        <activity
+            android:name=".feature.ui.shell.DisclaimerActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".feature.ui.shell.SetupActivity"
+            android:exported="false" />
+
+        
+<activity
+    android:name=".feature.alarm.AlarmSettingsActivity"
+    android:exported="false"
+    android:theme="@style/Theme.CgmBridge.ReminderDialog" />
+<!-- Notification listener for reading companion app notifications. -->
+        <service
+            android:name=".feature.input.notification.CgmNotificationListenerService"
+            android:exported="false"
+            android:label="@string/service_name_notification_listener"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!-- Lightweight foreground guardian service for stability. -->
+        <service
+            android:name=".feature.keepalive.CgmGuardianForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!-- Recreates periodic background work and guardian behavior after reboot/update. -->
+        <receiver
+            android:name=".feature.keepalive.BootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Reserved simple receiver for future restart hooks. -->
+        <receiver
+            android:name=".feature.keepalive.GuardianRestartReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
+        <!-- AlarmManager heartbeat receiver — watchdog for NotificationListenerService. -->
+        <receiver
+            android:name=".feature.keepalive.NotificationPollReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
+    </application>
+</manifest>

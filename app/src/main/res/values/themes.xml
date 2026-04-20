@@ -1,0 +1,14 @@
+<resources>
+    <style name="Theme.CgmBridge" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:statusBarColor">@color/bg_screen</item>
+        <item name="android:windowBackground">@color/bg_screen</item>
+        <item name="android:navigationBarColor">@android:color/black</item>
+    </style>
+
+<style name="Theme.CgmBridge.ReminderDialog" parent="Theme.MaterialComponents.DayNight.Dialog">
+    <item name="android:windowIsFloating">true</item>
+    <item name="android:windowCloseOnTouchOutside">false</item>
+    <item name="android:windowMinWidthMajor">95%</item>
+    <item name="android:windowMinWidthMinor">95%</item>
+</style>
+</resources>

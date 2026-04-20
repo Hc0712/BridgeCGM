@@ -1,0 +1,102 @@
+<resources>
+    <string name="app_name">BridgeCGM</string>
+    <string name="service_name_notification_listener">CGM Notification Listener</string>
+    <string name="guardian_notification_title">BridgeCGM is running</string>
+    <string name="guardian_notification_text">Listening for CGM notifications and forwarding to xDrip+.</string>
+    <string name="open_notification_access">Notification access</string>
+    <string name="open_battery_optimization">Battery optimization</string>
+    <string name="ok_continue">OK</string>
+    <string name="label_output_unit">Output glucose unit</string>
+    <string name="label_role">Role</string>
+    <string name="unit_mgdl">mg/dL</string>
+    <string name="unit_mmol">mmol/L</string>
+    <string name="role_host">Host</string>
+    <string name="role_receiver">Receiver</string>
+    <string name="setup_warning_title">Safety warning / 安全警告</string>
+    <string name="setup_warning_text">English: This app is only for displaying blood glucose levels. The values ​​it generates must not be used for any medical decisions, and absolutely must not be shared with medical devices!!!\n
+中文：本APP只用於顯示血糖，其所產生數值不可用於任何醫療決策，更不可分享到醫療器材!!!。</string>
+    <string name="home_waiting">Waiting for supported CGM notifications…</string>
+    <string name="home_supported_sources">Supported notification: Dexcom, AiDEX, OTTAI</string>
+    <string name="home_stats_title">Glucose Variability statisticized within</string>
+    <string name="home_stats_title_with_window">Glucose Variability statisticized within (%1$s)</string>
+    <string name="stat_sd_label">SD</string>
+    <string name="stat_cv_label">CV(%)</string>
+    <string name="stat_max_label">Maximum value</string>
+    <string name="stat_min_label">Minimum value</string>
+    <string name="stat_tir_label">TIR (%1$d–%2$d)</string>
+    <string name="stat_titr_label">TITR (70–140)</string>
+    <string name="stat_value_mgdl">%1$.1f mg/dL</string>
+    <string name="stat_value_mmol">%1$.1f mmol/L</string>
+    <string name="stat_value_int_mgdl">%1$d mg/dL</string>
+    <string name="stat_percent_value">%1$.1f</string>
+
+
+    <!-- Bottom navigation (rev1) -->
+    <string name="nav_graph">Graph</string>
+    <string name="nav_statistics">Stat.</string>
+    <string name="nav_carb_insulin">IOB/COB</string>
+    <string name="nav_tools">Tool</string>
+    <string name="nav_settings">Set.</string>
+
+    <!-- Settings menu (rev1) -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_subtitle">Select an item. Some items are placeholders for future work.</string>
+    <string name="settings_item_main">Main Setting</string>
+    <string name="settings_item_input">Input Setting</string>
+    <string name="settings_item_output">Output Setting</string>
+    <string name="settings_item_report_bug">Report Bug</string>
+    <string name="settings_report_hint">Report Bug will save an App Diagnostics ZIP to your chosen location. This works for normal users.</string>
+
+    <string name="future_work">Not implemented yet (future work).</string>
+    <string name="report_bug_saved">Saved diagnostics ZIP.</string>
+    <string name="report_bug_failed">Failed to save diagnostics ZIP: %1$s</string>
+
+    <string name="calibration_menu_title">Calibration Menu</string>
+    <string name="calibration_enable_disable">Enable/Disable Calibration</string>
+    <string name="calibration_select_algorithm">Select Calibration Algorithm</string>
+    <string name="calibration_algorithm_level_shift_formula">Level Shift:\n (Calibrated Value = Raw Value + Shift)</string>
+    <string name="calibration_algorithm_linear_formula">Linear Transform:\n (Calibrated Value = Raw Value × Slope + Shift)</string>
+    <string name="calibration_shift_label">Shift</string>
+    <string name="calibration_shift_hint">Shift (-30 ~ +30)</string>
+    <string name="calibration_slope_label">Slop</string>
+    <string name="calibration_shift_number_only">Please enter a valid number for Shift.</string>
+    <string name="calibration_over_range">Over Range +30 / -30</string>
+    <string name="calibration_notice_line1">確保校正時血糖維持平穩至少15分鐘(水平箭頭)，按OK後即在圖表畫出校正數值</string>
+    <string name="calibration_notice_line2">本APP限制只能校正約 +30% ~ -30%誤差，禁止更大校正以避免使用者使用過度不良CGM，建議檢查CGM效期及其儲存運輸狀況</string>
+    <string name="legend_calibrated_data">Calibrated Data</string>
+    <string name="legend_raw_data">Raw Data</string>
+    <string name="disclaimer_accept">Accept</string>
+    <string name="disclaimer_reject">Reject</string>
+<string name="settings_item_alarm">Alarm Setting</string>
+<string name="reminder_settings_title">Reminder settings</string>
+<string name="alarm_high_title">High blood glucose alert</string>
+<string name="alarm_high_threshold">Threshold of high blood glucose alert</string>
+<string name="alarm_low_title">Low blood glucose alert</string>
+<string name="alarm_low_threshold">Threshold of low blood glucose alert</string>
+<string name="alarm_reminder_method">Reminder method</string>
+<string name="alarm_reminder_interval">Reminder interval</string>
+<string name="alarm_alert_duration">Alert Duration</string>
+<string name="alarm_urgent_low_title">Urgent low blood glucose alert</string>
+<string name="alarm_urgent_low_threshold">Threshold of urgent low blood glucose alert</string>
+<string name="alarm_sound_label">Sound</string>
+<string name="alarm_minutes_suffix">%1$d minutes</string>
+<string name="alarm_seconds_suffix">%1$d Seconds</string>
+<string name="alarm_value_mgdl">%1$.0f mg/dL</string>
+<string name="alarm_value_mmol">%1$.1f mmol/L</string>
+<string name="alarm_invalid_range">Input out of range. No change was saved.</string>
+<string name="alarm_future_work">This item is reserved for future work.</string>
+<string name="alarm_current_value">Current value: %1$s</string>
+<string name="alarm_volume_muted_hint">Alarm volume is muted. Please increase the device alarm volume.</string>
+<string name="settings_alarm_tools_title">Alarm / Sound Tools</string>
+<string name="settings_alarm_tools_message">Notification access and alarm playback are separate. DND access state: %1$s</string>
+<string name="settings_state_granted">granted</string>
+<string name="settings_state_not_granted">not granted</string>
+<string name="settings_open_sound_settings">Open Sound Settings</string>
+<string name="settings_open_dnd_access">Open DND Access</string>
+<string name="settings_open_app_notification_settings">Open App Notification Settings</string>
+    <string name="stat_hba1c_est_label">HbA1c est.</string>
+    <string name="stat_range_label_placeholder">Range(in/high/low)</string>
+    <string name="stat_range_label_dynamic">Range(in/high/low) between %1$s and %2$s :</string>
+    <string name="stat_hba1c_value">%1$.1f%%</string>
+    <string name="stat_range_value">%1$.1f%% / %2$.1f%% / %3$.1f%%</string>
+</resources>

@@ -1,0 +1,54 @@
+# Migration Map
+
+| Original file | New file |
+|---|---|
+| `CgmBridgeApplication.kt` | `feature/keepalive/BridgeCGMApplication.kt` |
+| `boot/BootReceiver.kt` | `feature/keepalive/BootReceiver.kt` |
+| `boot/GuardianRestartReceiver.kt` | `feature/keepalive/GuardianRestartReceiver.kt` |
+| `config/FeatureFlags.kt` | `core/config/FeatureFlags.kt` |
+| `data/Models.kt` | `core/model/Models.kt` |
+| `data/Repository.kt` | `core/data/Repository.kt` |
+| `data/db/AppDatabase.kt` | `core/db/AppDatabase.kt` |
+| `data/db/Dao.kt` | `core/db/Dao.kt` |
+| `data/db/Entities.kt` | `core/db/Entities.kt` |
+| `importer/BgReadingImporter.kt` | `feature/input/notification/BgReadingImporter.kt` |
+| `notification/CgmNotificationListenerService.kt` | `feature/input/notification/CgmNotificationListenerService.kt` |
+| `notification/NotificationDebugDumper.kt` | `feature/input/notification/NotificationDebugDumper.kt` |
+| `notification/NotificationPollReceiver.kt` | `feature/keepalive/NotificationPollReceiver.kt` |
+| `notification/NotificationPollScheduler.kt` | `feature/keepalive/NotificationPollScheduler.kt` |
+| `notification/RemoteViewsTextExtractor.kt` | `feature/input/notification/RemoteViewsTextExtractor.kt` |
+| `parser/CgmStringFilter.kt` | `feature/input/notification/CgmStringFilter.kt` |
+| `parser/GenericCgmNotificationParser.kt` | `feature/input/notification/GenericCgmNotificationParser.kt` |
+| `parser/GlucoseUnitConverter.kt` | `feature/input/notification/GlucoseUnitConverter.kt` |
+| `parser/NotificationParseInput.kt` | `feature/input/notification/NotificationParseInput.kt` |
+| `parser/NotificationTimestampExtractor.kt` | `feature/input/notification/NotificationTimestampExtractor.kt` |
+| `parser/SlopeDirectionCalculator.kt` | `feature/input/notification/SlopeDirectionCalculator.kt` |
+| `parser/SupportedPackages.kt` | `feature/input/notification/SupportedPackages.kt` |
+| `parser/TrendDirectionMapper.kt` | `feature/input/notification/TrendDirectionMapper.kt` |
+| `service/CgmGuardianForegroundService.kt` | `feature/keepalive/CgmGuardianForegroundService.kt` |
+| `service/GuardianServiceLauncher.kt` | `feature/keepalive/GuardianServiceLauncher.kt` |
+| `ui/AlarmSettingsActivity.kt` | `feature/alarm/AlarmSettingsActivity.kt` |
+| `ui/CalibrationDialogHelper.kt` | `feature/calibration/CalibrationDialogHelper.kt` |
+| `ui/ChartHelper.kt` | `feature/statistics/ChartHelper.kt` |
+| `ui/DebugLogAdapter.kt` | `feature/ui/shell/DebugLogAdapter.kt` |
+| `ui/DisclaimerActivity.kt` | `feature/ui/shell/DisclaimerActivity.kt` |
+| `ui/GlucoseMarkerView.kt` | `feature/statistics/GlucoseMarkerView.kt` |
+| `ui/GlucoseVariabilityCalculator.kt` | `feature/statistics/GlucoseVariabilityCalculator.kt` |
+| `ui/MainActivity.kt` | `feature/ui/shell/MainActivity.kt` |
+| `ui/MainViewModel.kt` | `feature/ui/shell/MainViewModel.kt` |
+| `ui/SettingsMenuActivity.kt` | `feature/ui/shell/SettingsMenuActivity.kt` |
+| `ui/SetupActivity.kt` | `feature/ui/shell/SetupActivity.kt` |
+| `util/AlarmRule.kt` | `feature/alarm/AlarmRule.kt` |
+| `util/AlarmSoundPlayer.kt` | `feature/alarm/AlarmSoundPlayer.kt` |
+| `util/AppPrefs.kt` | `core/prefs/AppPrefs.kt` |
+| `util/BatteryOptimizationHelper.kt` | `core/platform/BatteryOptimizationHelper.kt` |
+| `util/BugReportExporter.kt` | `core/platform/BugReportExporter.kt` |
+| `util/CalibrationSettings.kt` | `feature/calibration/CalibrationSettings.kt` |
+| `util/DebugCategory.kt` | `core/logging/DebugCategory.kt` |
+| `util/DebugTrace.kt` | `core/logging/DebugTrace.kt` |
+| `util/GlucoseConstants.kt` | `core/constants/GlucoseConstants.kt` |
+| `util/NotificationAccessChecker.kt` | `core/platform/NotificationAccessChecker.kt` |
+| `util/ReminderAlertEvaluator.kt` | `feature/alarm/ReminderAlertEvaluator.kt` |
+| `worker/DatabaseMaintenanceWorker.kt` | `feature/keepalive/DatabaseMaintenanceWorker.kt` |
+| `worker/HealthCheckWorker.kt` | `feature/keepalive/HealthCheckWorker.kt` |
+| `xdrip/XDripBroadcastSender.kt` | `feature/output/xdrip/XDripBroadcastSender.kt` |

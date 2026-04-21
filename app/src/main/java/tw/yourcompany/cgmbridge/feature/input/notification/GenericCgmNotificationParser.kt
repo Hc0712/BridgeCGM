@@ -1,18 +1,24 @@
 package tw.yourcompany.cgmbridge.feature.input.notification
 
-import tw.yourcompany.cgmbridge.core.model.GlucoseSample
 import tw.yourcompany.cgmbridge.core.logging.DebugCategory
 import tw.yourcompany.cgmbridge.core.logging.DebugTrace
+import tw.yourcompany.cgmbridge.core.model.GlucoseSample
+import tw.yourcompany.cgmbridge.core.source.SourceIdentity
+import tw.yourcompany.cgmbridge.core.source.TransportType
 
 /**
- * Parses CGM notification text into a [GlucoseSample].
+ * Parses one CGM notification into a normalized [GlucoseSample].
  *
- * Two data paths (matching xDrip+ UiBasedCollector):
- *   1. **Primary** — contentView texts via RemoteViews inflation.
- *   2. **Fallback** — standard notification extras (EXTRA_TITLE / EXTRA_TEXT …).
+ * Parsing strategy:
+ * 1. Try the inflated `contentView` text list first because that most closely matches what the
+ *    user actually sees on screen.
+ * 2. Fall back to standard extras such as `EXTRA_TITLE` and `EXTRA_TEXT`.
+ * 3. Normalize the vendor and transport immediately so downstream code never needs to guess
+ *    whether `com.microtech.aidexx` and `aidex` are the same logical source.
  *
- * Verbose debug output (all PARSER-V-* tags) is controlled by the verbose flag in [DebugTrace]
- * which maps to cgmbridge.verboseDump in gradle.properties.
+ * The identity normalization in step 3 is part of the multi-source bug fix. Without it,
+ * different package variants could leak into the database as different pseudo-vendors and the
+ * graph would fail to group readings correctly.
  */
 class GenericCgmNotificationParser {
 
@@ -23,15 +29,19 @@ class GenericCgmNotificationParser {
     private val reAlert = Regex("(urgent low|urgent high|low|high|alarm|alert)", RegexOption.IGNORE_CASE)
     private val reBareInt = Regex("^-?\\d{2,3}$")
 
+    /**
+     * Parses the notification snapshot.
+     *
+     * The returned [GlucoseSample] already contains a normalized `sourceId`, normalized
+     * `vendorName`, and a canonical transport value of `NOTIFICATION`. This makes the importer,
+     * database, and graph code deterministic and removes the older package-name leakage bug.
+     */
     fun parse(input: NotificationParseInput): GlucoseSample? {
         val extrasTokens = listOfNotNull(input.title, input.text, input.subText, input.bigText, input.textLines, input.tickerText)
         val extrasCombined = extrasTokens.joinToString(" ").trim()
 
         DebugTrace.v(DebugCategory.PARSING, "PARSER-V-INPUT") {
-            "pkg=${input.sourcePackage} " +
-            "cvTexts(${input.contentViewTexts.size})=${input.contentViewTexts} " +
-            "extrasCombined=[$extrasCombined] " +
-            "postTimeMs=${input.postTimeMs}"
+            "pkg=${input.sourcePackage} cvTexts(${input.contentViewTexts.size})=${input.contentViewTexts} extrasCombined=[$extrasCombined] postTimeMs=${input.postTimeMs}"
         }
 
         val timestamp = NotificationTimestampExtractor.extractEpochMs(
@@ -41,7 +51,7 @@ class GenericCgmNotificationParser {
 
         DebugTrace.v(DebugCategory.PARSING, "PARSER-V-TS") { "resolvedTimestampMs=$timestamp (fallback=${input.postTimeMs})" }
 
-        // === PRIMARY PATH — contentView texts ===
+        // PRIMARY PATH — scan every visible TextView extracted from the RemoteViews tree.
         if (input.contentViewTexts.isNotEmpty()) {
             DebugTrace.v(DebugCategory.PARSING, "PARSER-V-PATH") { "Trying PRIMARY path (contentViewTexts)" }
             var matches = 0
@@ -52,120 +62,160 @@ class GenericCgmNotificationParser {
                 DebugTrace.v(DebugCategory.PARSING, "PARSER-V-CV") {
                     "raw=[$raw] filtered=[$filtered] parsedMgdl=$parsed"
                 }
-                if (parsed > 0) { mgdl = parsed; matches++ }
+                if (parsed > 0) {
+                    mgdl = parsed
+                    matches++
+                }
             }
             DebugTrace.v(DebugCategory.PARSING, "PARSER-V-CV-RESULT") {
                 "PRIMARY: matches=$matches mgdl=$mgdl rangeOk=${mgdl in 20..600}"
             }
             if (matches == 1 && mgdl in 20..600) {
                 val dir = extractDirection(extrasCombined, input.contentViewTexts)
-                DebugTrace.v(DebugCategory.PARSING, "PARSER-V-DIR") {
-                    "Direction (PRIMARY): extrasCombined=[$extrasCombined] → dir=$dir"
-                }
-                val sample = GlucoseSample(
-                    timestamp, mgdl, dir,
-                    input.sourcePackage,
-                    extrasCombined.ifBlank { input.contentViewTexts.joinToString(" ") },
-                    reStatus.find(extrasCombined)?.value,
-                    reAlert.find(extrasCombined)?.value
+                val sample = buildSample(
+                    ts = timestamp,
+                    mgdl = mgdl,
+                    text = extrasCombined.ifBlank { input.contentViewTexts.joinToString(" ") },
+                    pkg = input.sourcePackage,
+                    explicitDirection = dir
                 )
                 DebugTrace.v(DebugCategory.PARSING, "PARSER-V-RESULT") {
-                    "PRIMARY result: ts=$timestamp mgdl=$mgdl dir=$dir " +
-                    "status=${sample.sensorStatus} alert=${sample.alertText}"
+                    "PRIMARY result: ts=$timestamp mgdl=$mgdl dir=$dir status=${sample.sensorStatus} alert=${sample.alertText} sourceId=${sample.sourceId}"
                 }
                 return sample
             }
         }
 
-        // === FALLBACK PATH — extras ===
+        // FALLBACK PATH — title / text / bigText / ticker text.
         DebugTrace.v(DebugCategory.PARSING, "PARSER-V-PATH") { "Trying FALLBACK path (extras)" }
 
-        // 1) Title after xDrip-style filtering
         val titleMgdl = tryExtractFromTitle(input.title)
-        DebugTrace.v(DebugCategory.PARSING, "PARSER-V-FALLBACK") {
-            "FALLBACK step1 title=[${input.title.orEmpty()}] titleMgdl=$titleMgdl"
-        }
         if (titleMgdl in 20..600) {
             val sample = buildSample(timestamp, titleMgdl, extrasCombined, input.sourcePackage)
             DebugTrace.v(DebugCategory.PARSING, "PARSER-V-RESULT") {
-                "FALLBACK(title) result: ts=$timestamp mgdl=$titleMgdl dir=${sample.direction}"
+                "FALLBACK title result: ts=$timestamp mgdl=$titleMgdl dir=${sample.direction} sourceId=${sample.sourceId}"
             }
             return sample
         }
 
-        // 2) Explicit mg/dL unit
         reMgdl.find(extrasCombined)?.let {
             val v = it.groupValues[1].toInt()
-            DebugTrace.v(DebugCategory.PARSING, "PARSER-V-FALLBACK") {
-                "FALLBACK step2 mgdl regex match=[${it.value}] mgdl=$v"
+            if (v in 20..600) {
+                val sample = buildSample(timestamp, v, extrasCombined, input.sourcePackage)
+                DebugTrace.v(DebugCategory.PARSING, "PARSER-V-RESULT") {
+                    "FALLBACK mgdl result: ts=$timestamp mgdl=$v dir=${sample.direction} sourceId=${sample.sourceId}"
+                }
+                return sample
             }
-            val sample = buildSample(timestamp, v, extrasCombined, input.sourcePackage)
-            DebugTrace.v(DebugCategory.PARSING, "PARSER-V-RESULT") {
-                "FALLBACK(mgdl-unit) result: ts=$timestamp mgdl=$v dir=${sample.direction}"
-            }
-            return sample
         }
 
-        // 3) Explicit mmol/L unit
         reMmol.find(extrasCombined)?.let {
             val v = GlucoseUnitConverter.mmolToMgdl(it.groupValues[1].replace(',', '.').toDouble())
-            DebugTrace.v(DebugCategory.PARSING, "PARSER-V-FALLBACK") {
-                "FALLBACK step3 mmol regex match=[${it.value}] convertedMgdl=$v"
+            if (v in 20..600) {
+                val sample = buildSample(timestamp, v, extrasCombined, input.sourcePackage)
+                DebugTrace.v(DebugCategory.PARSING, "PARSER-V-RESULT") {
+                    "FALLBACK mmol result: ts=$timestamp mgdl=$v dir=${sample.direction} sourceId=${sample.sourceId}"
+                }
+                return sample
             }
-            val sample = buildSample(timestamp, v, extrasCombined, input.sourcePackage)
-            DebugTrace.v(DebugCategory.PARSING, "PARSER-V-RESULT") {
-                "FALLBACK(mmol-unit) result: ts=$timestamp mgdl=$v dir=${sample.direction}"
-            }
-            return sample
         }
 
-        // 4) Status / alert only
         val status = reStatus.find(extrasCombined)?.value
         val alert = reAlert.find(extrasCombined)?.value
-        DebugTrace.v(DebugCategory.PARSING, "PARSER-V-FALLBACK") {
-            "FALLBACK step4 status=[$status] alert=[$alert]"
-        }
-        if (status != null || alert != null) {
-            DebugTrace.v(DebugCategory.PARSING, "PARSER-V-RESULT") {
-                "StatusOnly: status=$status alert=$alert"
+        if (!status.isNullOrBlank() || !alert.isNullOrBlank()) {
+            DebugTrace.v(DebugCategory.PARSING, "PARSER-V-STATUS") {
+                "Status-only notification: status=$status alert=$alert"
             }
-            return GlucoseSample(timestamp, -1, "NONE", input.sourcePackage, extrasCombined, status, alert)
+            val vendor = SupportedPackages.vendorForPackage(input.sourcePackage)
+            val transport = TransportType.NOTIFICATION
+            return GlucoseSample(
+                sourceId = SourceIdentity.buildSourceId(transport, vendor, null),
+                transportType = transport.name,
+                vendorName = vendor,
+                originKey = null,
+                timestampMs = timestamp,
+                valueMgdl = -1,
+                direction = "NONE",
+                rawText = extrasCombined,
+                sensorStatus = status,
+                alertText = alert
+            )
         }
 
-        DebugTrace.v(DebugCategory.PARSING, "PARSER-V-RESULT") { "No parse result — returning null" }
+        DebugTrace.v(DebugCategory.PARSING, "PARSER-V-RESULT") { "No BG parse result for pkg=${input.sourcePackage}" }
         return null
     }
 
-    // --- helpers ---
-
-    private fun buildSample(ts: Long, mgdl: Int, text: String, pkg: String): GlucoseSample {
+    /**
+     * Builds a fully normalized [GlucoseSample].
+     *
+     * This helper is the key part of the source-identity fix:
+     * - vendor name comes from [SupportedPackages.vendorForPackage],
+     * - transport is always `NOTIFICATION`,
+     * - `sourceId` is built from the normalized identity fields rather than from the raw Android
+     *   package name.
+     */
+    private fun buildSample(ts: Long, mgdl: Int, text: String, pkg: String, explicitDirection: String? = null): GlucoseSample {
         val trendRaw = reTrend.find(text)?.value
-        val dir = TrendDirectionMapper.map(trendRaw)
+        val dir = explicitDirection ?: TrendDirectionMapper.map(trendRaw)
+        val vendor = SupportedPackages.vendorForPackage(pkg)
+        val transport = TransportType.NOTIFICATION
         DebugTrace.v(DebugCategory.PARSING, "PARSER-V-DIR") {
-            "Direction (FALLBACK): trendRaw=[$trendRaw] → dir=$dir in text=[$text]"
+            "Direction: trendRaw=[$trendRaw] explicit=$explicitDirection -> dir=$dir in text=[$text]"
         }
         return GlucoseSample(
-            ts, mgdl, dir,
-            pkg, text, reStatus.find(text)?.value, reAlert.find(text)?.value
+            sourceId = SourceIdentity.buildSourceId(transport, vendor, null),
+            transportType = transport.name,
+            vendorName = vendor,
+            originKey = null,
+            timestampMs = ts,
+            valueMgdl = mgdl,
+            direction = dir,
+            rawText = text,
+            sensorStatus = reStatus.find(text)?.value,
+            alertText = reAlert.find(text)?.value
         )
     }
 
+    /**
+     * Attempts to parse a single already-filtered text token into mg/dL.
+     *
+     * The method accepts:
+     * - integer mg/dL values such as `120`
+     * - decimal mmol/L values such as `5.6` or `5,6`
+     *
+     * Any unrecognized token returns `-1`.
+     */
     private fun tryExtractFiltered(filtered: String): Int {
         val t = filtered.trim()
         if (t.isEmpty()) return -1
         if (reBareInt.matches(t)) return t.toIntOrNull() ?: -1
         if (CgmStringFilter.isValidMmol(t)) {
-            return try { GlucoseUnitConverter.mmolToMgdl(t.replace(',', '.').toDouble()) }
-            catch (_: NumberFormatException) { -1 }
+            return try {
+                GlucoseUnitConverter.mmolToMgdl(t.replace(',', '.').toDouble())
+            } catch (_: NumberFormatException) {
+                -1
+            }
         }
         return -1
     }
 
+    /**
+     * Tries to parse the notification title as a glucose token.
+     * Some vendors place the number in the title rather than the body.
+     */
     private fun tryExtractFromTitle(title: String?): Int {
         if (title.isNullOrBlank()) return -1
         return tryExtractFiltered(CgmStringFilter.filter(title))
     }
 
+    /**
+     * Extracts a normalized trend direction from either extras text or contentView text.
+     *
+     * Extras are checked first because some vendors duplicate the visible arrow there, but the
+     * contentView path remains as a backup for layouts where the arrow exists only inside the
+     * custom notification UI.
+     */
     private fun extractDirection(extras: String, cvTexts: List<String>): String {
         reTrend.find(extras)?.value?.let {
             DebugTrace.v(DebugCategory.PARSING, "PARSER-V-DIR-DETAIL") { "Direction from extras: raw=[$it]" }
@@ -177,7 +227,7 @@ class GenericCgmNotificationParser {
                 return TrendDirectionMapper.map(it)
             }
         }
-        DebugTrace.v(DebugCategory.PARSING, "PARSER-V-DIR-DETAIL") { "No trend token found → NONE" }
+        DebugTrace.v(DebugCategory.PARSING, "PARSER-V-DIR-DETAIL") { "No trend token found -> NONE" }
         return "NONE"
     }
 }

@@ -15,23 +15,23 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import tw.yourcompany.cgmbridge.R
 import tw.yourcompany.cgmbridge.core.db.BgReadingEntity
+import tw.yourcompany.cgmbridge.core.db.CgmSourceEntity
+import tw.yourcompany.cgmbridge.core.logging.DebugCategory
+import tw.yourcompany.cgmbridge.core.logging.DebugTrace
+import tw.yourcompany.cgmbridge.core.platform.NotificationAccessChecker
+import tw.yourcompany.cgmbridge.core.prefs.AppPrefs
+import tw.yourcompany.cgmbridge.core.prefs.MultiSourceSettings
 import tw.yourcompany.cgmbridge.databinding.ActivityMainBinding
 import tw.yourcompany.cgmbridge.feature.calibration.CalibrationDialogHelper
 import tw.yourcompany.cgmbridge.feature.input.notification.GlucoseUnitConverter
 import tw.yourcompany.cgmbridge.feature.input.notification.SlopeDirectionCalculator
 import tw.yourcompany.cgmbridge.feature.keepalive.GuardianServiceLauncher
-import tw.yourcompany.cgmbridge.core.prefs.AppPrefs
-import tw.yourcompany.cgmbridge.core.logging.DebugCategory
-import tw.yourcompany.cgmbridge.core.logging.DebugTrace
-import tw.yourcompany.cgmbridge.core.platform.NotificationAccessChecker
 import tw.yourcompany.cgmbridge.feature.statistics.ChartHelper
 import tw.yourcompany.cgmbridge.feature.statistics.GlucoseVariabilityCalculator
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.GregorianCalendar
 import java.util.Locale
-import kotlin.math.roundToInt
-import kotlin.math.sqrt
 
 /**
  * Main screen — mirrors xDrip+ Home layout:
@@ -39,25 +39,25 @@ import kotlin.math.sqrt
  * - Minutes ago + delta (left-aligned info block)
  * - Date selector (7 days) + Time window chips (3/6/12/24h)
  * - Detail chart (zoomable, with crosshair marker)
- * - Overview chart (full-day preview)
- * - Glucose Variability statisticized within stats (SD, CV, Min, Max, HbA1c est., Range)
+ * - Overview chart (full-day preview / mini graph)
+ * - Glucose variability statistics
+ *
+ * Multi-source behavior after this patch:
+ * - the detail chart shows all visible sources at the same time;
+ * - the overview chart shows only the selected primary source;
+ * - the large top BG value also prefers the selected primary source when one exists.
  */
 class MainActivity : AppCompatActivity() {
-
-    // TIR range defaults (mg/dL). TODO: make user-configurable in settings.
-    private companion object {
-        const val TIR_LOW_MGDL = 70.0
-        const val TIR_HIGH_MGDL = 180.0
-        const val TITR_LOW_MGDL = 70.0
-        const val TITR_HIGH_MGDL = 140.0
-    }
 
     private lateinit var binding: ActivityMainBinding
     private val vm: MainViewModel by viewModels()
     private lateinit var prefs: AppPrefs
+    private lateinit var multiSourceSettings: MultiSourceSettings
 
     private var latestReadingsCache: List<BgReadingEntity> = emptyList()
     private var overviewCache: List<BgReadingEntity> = emptyList()
+    private var sourcesCache: List<CgmSourceEntity> = emptyList()
+    private var primarySourceId: String? = null
     private var currentOutputUnit: String = "mgdl"
     private var currentWindowHours: Int = 24
     private var currentDateOffset: Int = 0
@@ -65,13 +65,17 @@ class MainActivity : AppCompatActivity() {
     /** Date button views (index 0 = today, 6 = 6 days ago). */
     private lateinit var dateButtons: List<TextView>
 
-
     private val graphSettingKeys = setOf(
         "dLowBloodMgdl",
         "dHighBloodMgdl",
         "outputUnit"
     )
 
+    /**
+     * Re-renders the charts when a graph-relevant preference changes.
+     *
+     * We listen only to graph-related keys so unrelated settings do not cause unnecessary redraws.
+     */
     private val prefsChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key !in graphSettingKeys) return@OnSharedPreferenceChangeListener
         val latestUnit = prefs.outputUnit
@@ -83,42 +87,35 @@ class MainActivity : AppCompatActivity() {
         renderAll()
     }
 
+    /**
+     * Creates the screen, wires the navigation / chips / observers, and prepares both charts.
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         prefs = AppPrefs(this)
+        multiSourceSettings = MultiSourceSettings(this)
+        primarySourceId = multiSourceSettings.primaryInputSourceId
         currentOutputUnit = prefs.outputUnit
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         prefs.registerChangeListener(prefsChangeListener)
 
-        // Init both charts
         ChartHelper.initDetail(binding.glucoseChartDetail, currentOutputUnit)
         ChartHelper.initOverview(binding.glucoseChartOverview, currentOutputUnit)
 
-        // Bottom navigation (rev1)
         setupBottomNav()
         markSelectedTab(isGraph = true)
 
-        // ── Date selector buttons ──
         dateButtons = listOf(
             binding.dateBtn0, binding.dateBtn1, binding.dateBtn2, binding.dateBtn3,
             binding.dateBtn4, binding.dateBtn5, binding.dateBtn6
         )
         setupDateButtons()
 
-        // ── Time window chips ──
-        binding.chip3h.setOnClickListener {
-            vm.observe3h(); currentWindowHours = 3; updateChipState(3)
-        }
-        binding.chip6h.setOnClickListener {
-            vm.observe6h(); currentWindowHours = 6; updateChipState(6)
-        }
-        binding.chip12h.setOnClickListener {
-            vm.observe12h(); currentWindowHours = 12; updateChipState(12)
-        }
-        binding.chip24h.setOnClickListener {
-            vm.observe24h(); currentWindowHours = 24; updateChipState(24)
-        }
+        binding.chip3h.setOnClickListener { vm.observe3h(); currentWindowHours = 3; updateChipState(3) }
+        binding.chip6h.setOnClickListener { vm.observe6h(); currentWindowHours = 6; updateChipState(6) }
+        binding.chip12h.setOnClickListener { vm.observe12h(); currentWindowHours = 12; updateChipState(12) }
+        binding.chip24h.setOnClickListener { vm.observe24h(); currentWindowHours = 24; updateChipState(24) }
         updateChipState(24)
 
         if (NotificationAccessChecker.isNotificationAccessGranted(this)) {
@@ -128,14 +125,19 @@ class MainActivity : AppCompatActivity() {
         DebugTrace.t(
             DebugCategory.KEEPALIVE,
             "UI-STATE",
-            "notif_access=${NotificationAccessChecker.isNotificationAccessGranted(this)} unit=${prefs.outputUnit} role=${prefs.role}"
+            "notif_access=${NotificationAccessChecker.isNotificationAccessGranted(this)} unit=${prefs.outputUnit} role=${prefs.role} primary=$primarySourceId"
         )
 
         observeData()
     }
 
+    /**
+     * Refreshes unit-sensitive chart setup and the currently selected primary source whenever the
+     * activity returns to the foreground.
+     */
     override fun onResume() {
         super.onResume()
+        primarySourceId = multiSourceSettings.primaryInputSourceId
         val latestUnit = prefs.outputUnit
         if (latestUnit != currentOutputUnit) {
             currentOutputUnit = latestUnit
@@ -150,8 +152,9 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
-    // ─── Date Selector ──────────────────────────────────────────────────
-
+    /**
+     * Populates the 7-day date selector and binds each button to the correct historical day.
+     */
     private fun setupDateButtons() {
         val dateFmt = SimpleDateFormat("MM/dd", Locale.getDefault())
         for (i in dateButtons.indices) {
@@ -159,9 +162,7 @@ class MainActivity : AppCompatActivity() {
             if (i == 0) {
                 btn.text = "Today"
             } else {
-                val cal = GregorianCalendar().apply {
-                    add(Calendar.DAY_OF_YEAR, -i)
-                }
+                val cal = GregorianCalendar().apply { add(Calendar.DAY_OF_YEAR, -i) }
                 btn.text = dateFmt.format(cal.time)
             }
             btn.setOnClickListener {
@@ -173,6 +174,7 @@ class MainActivity : AppCompatActivity() {
         updateDateButtonState(0)
     }
 
+    /** Highlights the selected date button. */
     private fun updateDateButtonState(selectedOffset: Int) {
         val sel = 0xFF4CAF50.toInt()
         val nor = 0xFF888888.toInt()
@@ -181,27 +183,36 @@ class MainActivity : AppCompatActivity() {
             btn.setTextColor(if (i == selectedOffset) sel else nor)
             btn.setTypeface(
                 null,
-                if (i == selectedOffset) android.graphics.Typeface.BOLD
-                else android.graphics.Typeface.NORMAL
+                if (i == selectedOffset) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL
             )
         }
     }
 
-    // ─── Observers ───────────────────────────────────────────────────────
-
+    /**
+     * Registers all LiveData observers used by the main screen.
+     *
+     * We observe readings and source metadata separately because the graph needs both pieces:
+     * readings provide values and timestamps, while the source registry provides color / label /
+     * visibility information.
+     */
     private fun observeData() {
-        // Detail chart data (date + time window filtered)
         vm.latestReadings.observe(this) { list ->
             latestReadingsCache = list.orEmpty()
             renderAll()
         }
-        // Overview chart data (full day for selected date)
         vm.overviewReadings.observe(this) { list ->
             overviewCache = list.orEmpty()
             renderOverview()
         }
+        vm.allSources.observe(this) { list ->
+            sourcesCache = list.orEmpty()
+            renderAll()
+        }
     }
 
+    /**
+     * Re-renders every UI block that depends on the current reading/source state.
+     */
     private fun renderAll() {
         renderBgInfo(latestReadingsCache)
         renderDetailChart(latestReadingsCache)
@@ -209,10 +220,29 @@ class MainActivity : AppCompatActivity() {
         renderStats(if (latestReadingsCache.isEmpty()) null else calculateStats(latestReadingsCache))
     }
 
-    // ─── BG Value + Arrow + Delta + Minutes Ago ──────────────────────────
+    /**
+     * Chooses the row that should drive the large top BG value.
+     *
+     * Rule:
+     * - if a primary source is selected and that source has rows in the current list, use the
+     *   latest row from that source;
+     * - otherwise, fall back to the latest row across all sources.
+     */
+    private fun latestForDisplay(list: List<BgReadingEntity>): BgReadingEntity? {
+        val primaryRows = primarySourceId?.let { id -> list.filter { it.sourceId == id } }.orEmpty()
+        val target = if (primaryRows.isNotEmpty()) primaryRows else list
+        return target.maxByOrNull { it.timestampMs }
+    }
 
+    /**
+     * Renders the latest glucose value, direction arrow, minutes ago, and 5-minute delta.
+     *
+     * The slope is calculated from the same source-specific subset that drives the displayed top
+     * value, preventing a non-primary source from influencing the arrow shown for the primary one.
+     */
     private fun renderBgInfo(list: List<BgReadingEntity>) {
-        if (list.isEmpty()) {
+        val latest = latestForDisplay(list)
+        if (latest == null) {
             binding.latestValueText.text = "--"
             binding.latestValueText.setTextColor(0xFFFFFFFF.toInt())
             binding.directionArrowText.text = ""
@@ -221,9 +251,12 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        val latest = list.maxBy { it.timestampMs }
+        val rowsForDisplay = if (!primarySourceId.isNullOrBlank()) {
+            list.filter { it.sourceId == primarySourceId }
+        } else {
+            list
+        }
 
-        // ── BG Value ──
         val mgdl = latest.calibratedValueMgdl
         val displayValue = if (currentOutputUnit == "mmol") {
             GlucoseUnitConverter.mgdlToMmolString(mgdl)
@@ -232,78 +265,68 @@ class MainActivity : AppCompatActivity() {
         }
         binding.latestValueText.text = displayValue
 
-        // Color by range (xDrip: lowMark=70, highMark=170)
         val bgColor = when {
-            mgdl < 70   -> 0xFFFF5252.toInt()
-            mgdl <= 170  -> 0xFF4CAF50.toInt()
-            else         -> 0xFFFFC107.toInt()
+            mgdl < 70 -> 0xFFFF5252.toInt()
+            mgdl <= 170 -> 0xFF4CAF50.toInt()
+            else -> 0xFFFFC107.toInt()
         }
         binding.latestValueText.setTextColor(bgColor)
 
-        // ── Slope / Direction / Delta ──
-        val slope = SlopeDirectionCalculator.calculate(list)
-
-        val arrow = SlopeDirectionCalculator.directionToArrow(slope.directionName)
-        binding.directionArrowText.text = arrow
+        val slope = SlopeDirectionCalculator.calculate(rowsForDisplay)
+        binding.directionArrowText.text = SlopeDirectionCalculator.directionToArrow(slope.directionName)
         binding.directionArrowText.setTextColor(bgColor)
-
-        binding.minutesAgoText.text = if (slope.minutesAgo <= 0) {
-            "Just now"
-        } else {
-            "${slope.minutesAgo} min ago"
-        }
+        binding.minutesAgoText.text = if (slope.minutesAgo <= 0) "Just now" else "${slope.minutesAgo} min ago"
 
         if (!slope.isValid || slope.deltaPerFiveMin.isNaN()) {
             binding.deltaText.text = "Delta: ???"
+        } else if (currentOutputUnit == "mmol") {
+            binding.deltaText.text = String.format(Locale.US, "Delta: %+.2f mmol/L per 5-min", slope.deltaPerFiveMin / 18.0)
         } else {
-            val delta5 = slope.deltaPerFiveMin
-            if (currentOutputUnit == "mmol") {
-                val deltaMMol = delta5 / 18.0
-                binding.deltaText.text = String.format(Locale.US, "Delta: %+.2f mmol/L per 5-min", deltaMMol)
-            } else {
-                binding.deltaText.text = String.format(Locale.US, "Delta: %+.1f mg/dL per 5-min", delta5)
-            }
+            binding.deltaText.text = String.format(Locale.US, "Delta: %+.1f mg/dL per 5-min", slope.deltaPerFiveMin)
         }
     }
 
-    // ─── Charts ──────────────────────────────────────────────────────────
-
+    /**
+     * Renders the main graph with all visible sources.
+     */
     private fun renderDetailChart(list: List<BgReadingEntity>) {
         ChartHelper.renderDetail(
             binding.glucoseChartDetail,
             list,
+            sourcesCache,
             currentOutputUnit,
             vm.dayStartMs(),
             currentWindowHours,
             vm.isToday(),
+            primarySourceId,
             prefs.calibrationEnabled,
             prefs.dLowBlood,
             prefs.dHighBlood
         )
     }
 
+    /**
+     * Renders the mini graph using only the selected primary source.
+     */
     private fun renderOverview() {
         val data = if (overviewCache.isNotEmpty()) overviewCache else latestReadingsCache
         ChartHelper.renderOverview(
             binding.glucoseChartOverview,
             data,
+            sourcesCache,
             currentOutputUnit,
             vm.dayStartMs(),
             currentWindowHours,
             vm.isToday(),
+            primarySourceId,
+            prefs.calibrationEnabled,
             prefs.dLowBlood,
             prefs.dHighBlood
         )
     }
-    // ─── Statistics (xDrip-aligned glucose variability block) ────────────
 
     /**
-     * Calculates the currently visible Glucose Variability statistics.
-     *
-     * The selected chip (3h / 6h / 12h / 24h) already controls [latestReadingsCache],
-     * so this method simply forwards the visible rows to the dedicated calculator.
-     * Keeping the math in a dedicated file makes the formulas easier to audit
-     * against xDrip and avoids hidden UI-side inconsistencies.
+     * Calculates glucose variability statistics for the currently visible detail-chart rows.
      */
     private fun calculateStats(list: List<BgReadingEntity>): GlucoseVariabilityCalculator.Result? {
         return GlucoseVariabilityCalculator.calculate(
@@ -314,24 +337,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Renders the 6-item Glucose Variability section on the main graph screen.
-     *
-     * Displayed items:
-     * 1. SD
-     * 2. CV(%)
-     * 3. Minimum Value
-     * 4. Maximum Value
-     * 5. HbA1c est.
-     * 6. Range(in/high/low)
-     *
-     * Range thresholds come from Alarm Settings ([AppPrefs.dLowBlood] and
-     * [AppPrefs.dHighBlood]). That means changing alarm thresholds updates the
-     * label and the in/high/low breakdown on this screen as well.
+     * Renders the statistics block below the charts.
      */
     private fun renderStats(stats: GlucoseVariabilityCalculator.Result?) {
         val windowLabel = "${currentWindowHours}h"
         binding.statsTitleText.text = getString(R.string.home_stats_title_with_window, windowLabel)
-
         binding.statRangeLabelText.text = getString(
             R.string.stat_range_label_dynamic,
             formatGlucoseThresholdForStatsLabel(prefs.dLowBlood),
@@ -369,11 +379,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Formats an alarm threshold for the dynamic Range label.
-     *
-     * The label intentionally shows the actual threshold values so the user can
-     * immediately see which "in/high/low" cut-offs are being used without opening
-     * Alarm Settings again.
+     * Formats an alarm threshold for the dynamic statistics label.
      */
     private fun formatGlucoseThresholdForStatsLabel(valueMgdl: Double): String {
         return if (currentOutputUnit == "mmol") {
@@ -383,29 +389,22 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // ─── Helpers ─────────────────────────────────────────────────────────
-
+    /** Highlights the currently selected time-window chip. */
     private fun updateChipState(hours: Int) {
         val sel = 0xFF4CAF50.toInt()
         val nor = 0xFF888888.toInt()
         val chips = listOf(binding.chip3h to 3, binding.chip6h to 6, binding.chip12h to 12, binding.chip24h to 24)
         for ((chip, h) in chips) {
             chip.setTextColor(if (hours == h) sel else nor)
-            chip.setTypeface(
-                null,
-                if (hours == h) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL
-            )
+            chip.setTypeface(null, if (hours == h) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
         }
     }
 
-
+    /**
+     * Wires the bottom navigation actions used by this screen.
+     */
     private fun setupBottomNav() {
-        // Graph: already on this screen.
-        binding.bottomNav.btnNavGraph.setOnClickListener {
-            // optional: scroll to top
-            binding.root.scrollTo(0, 0)
-        }
-
+        binding.bottomNav.btnNavGraph.setOnClickListener { binding.root.scrollTo(0, 0) }
         binding.bottomNav.btnNavStatistics.setOnClickListener {
             Toast.makeText(this, getString(R.string.future_work), Toast.LENGTH_SHORT).show()
         }
@@ -413,15 +412,14 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, getString(R.string.future_work), Toast.LENGTH_SHORT).show()
         }
         binding.bottomNav.btnNavTools.setOnClickListener {
-            CalibrationDialogHelper.showCalibrationMenu(this, prefs) {
-                renderAll()
-            }
+            CalibrationDialogHelper.showCalibrationMenu(this, prefs) { renderAll() }
         }
         binding.bottomNav.btnNavSettings.setOnClickListener {
             startActivity(Intent(this, SettingsMenuActivity::class.java))
         }
     }
 
+    /** Highlights the selected bottom-nav tab. */
     private fun markSelectedTab(isGraph: Boolean) {
         val sel = 0xFF4CAF50.toInt()
         val nor = 0xFF888888.toInt()

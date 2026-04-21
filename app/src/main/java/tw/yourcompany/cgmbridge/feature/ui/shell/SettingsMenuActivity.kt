@@ -1,10 +1,8 @@
 package tw.yourcompany.cgmbridge.feature.ui.shell
 
-import android.app.NotificationManager
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.provider.Settings
 import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -13,33 +11,28 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import tw.yourcompany.cgmbridge.R
-import tw.yourcompany.cgmbridge.databinding.ActivitySettingsMenuBinding
-import tw.yourcompany.cgmbridge.core.prefs.AppPrefs
 import tw.yourcompany.cgmbridge.core.platform.BugReportExporter
+import tw.yourcompany.cgmbridge.core.prefs.MultiSourceSettings
+import tw.yourcompany.cgmbridge.core.source.SourceIdentity
+import tw.yourcompany.cgmbridge.core.source.TransportType
+import tw.yourcompany.cgmbridge.databinding.ActivitySettingsMenuBinding
 import tw.yourcompany.cgmbridge.feature.alarm.AlarmSettingsActivity
-import tw.yourcompany.cgmbridge.feature.calibration.CalibrationDialogHelper
 
 /**
- * Settings menu screen (first revision).
+ * Settings menu screen.
  *
- * Contains placeholder entries for future work:
- * - Main Settings
- * - Input Source
- * - Output Source
+ * This patched version adds the missing “Input Setting” flow required by the multi-source product
+ * spec. The user can now choose one exact primary input source by selecting:
+ * - vendor name,
+ * - protocol / transport type.
  *
- * Implements "Report Bug" for non-developer users:
- * - Uses Storage Access Framework (system file picker) to let user choose a save location.
- * - Creates an "App Diagnostics" ZIP (app logs + app-level stack traces + app-level dumps).
- *
- * Note: A normal app cannot capture a full system bugreport/logcat/dumpsys on most devices.
- * This screen therefore produces a useful app-scoped report, and optionally guides the user
- * to the system Developer Options where the OS can create a full bugreport zip.
- *
- * Adds Alarm Setting entry and keeps Report Bug export support.
+ * The resulting source is stored as a normalized `sourceId` and is then reused by the graph,
+ * calibration, alarm, and stale-primary logic.
  */
 class SettingsMenuActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivitySettingsMenuBinding
+    private lateinit var multiSourceSettings: MultiSourceSettings
 
     private val saveReportLauncher = registerForActivityResult(
         ActivityResultContracts.CreateDocument("application/zip")
@@ -48,24 +41,25 @@ class SettingsMenuActivity : AppCompatActivity() {
         exportBugReport(uri)
     }
 
+    /**
+     * Initializes the settings menu, wires all buttons, and restores the current primary-source
+     * selection helper.
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivitySettingsMenuBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        binding.menuMainSettings.setOnClickListener { openAlarmPermissionTools() }
+        multiSourceSettings = MultiSourceSettings(this)
 
         setupBottomNav()
         markSelectedTab(isSettings = true)
 
         binding.menuMainSettings.setOnClickListener {
-            // Launch SetupActivity so user can re-do setup, force showing it
             val intent = Intent(this, SetupActivity::class.java)
             intent.putExtra("forceShow", true)
             startActivity(intent)
         }
-        binding.menuInputSource.setOnClickListener {
-            Toast.makeText(this, getString(R.string.future_work), Toast.LENGTH_SHORT).show()
-        }
+        binding.menuInputSource.setOnClickListener { showPrimaryInputDialog() }
         binding.menuOutputSource.setOnClickListener {
             Toast.makeText(this, getString(R.string.future_work), Toast.LENGTH_SHORT).show()
         }
@@ -73,49 +67,92 @@ class SettingsMenuActivity : AppCompatActivity() {
             startActivity(Intent(this, AlarmSettingsActivity::class.java))
         }
         binding.menuReportBug.setOnClickListener {
-            val defaultName = BugReportExporter.defaultFileName()
-            saveReportLauncher.launch(defaultName)
+            saveReportLauncher.launch(BugReportExporter.defaultFileName())
         }
     }
 
+    /**
+     * Opens a two-step chooser for the primary input source.
+     *
+     * Step 1: choose vendor.
+     * Step 2: choose protocol.
+     *
+     * The UI is intentionally simple and dialog-based so the feature can be added without creating
+     * a new layout or activity.
+     */
+    private fun showPrimaryInputDialog() {
+        val vendors = arrayOf("aidex", "ottai", "dexcom")
+        val protocols = arrayOf("notification", "bluetooth", "WIFI", "NightScout")
+        val current = currentSelectionState(vendors, protocols)
+        var vendorIndex = current.first
+        var protocolIndex = current.second
 
-    private fun openAlarmPermissionTools() {
-        val nm = getSystemService(NotificationManager::class.java)
-        val dndGranted = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-            nm?.isNotificationPolicyAccessGranted == true
-        } else true
         AlertDialog.Builder(this)
-            .setTitle(getString(R.string.settings_alarm_tools_title))
-            .setMessage(getString(R.string.settings_alarm_tools_message, if (dndGranted) getString(R.string.settings_state_granted) else getString(R.string.settings_state_not_granted)))
-            .setPositiveButton(R.string.settings_open_sound_settings) { _, _ -> startActivity(Intent(Settings.ACTION_SOUND_SETTINGS)) }
-            .setNeutralButton(R.string.settings_open_dnd_access) { _, _ -> startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)) }
-            .setNegativeButton(R.string.settings_open_app_notification_settings) { _, _ ->
-                startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply { putExtra(Settings.EXTRA_APP_PACKAGE, packageName) })
+            .setTitle("Select Vendor")
+            .setSingleChoiceItems(vendors, vendorIndex) { _, which -> vendorIndex = which }
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                AlertDialog.Builder(this)
+                    .setTitle("Select Protocol")
+                    .setSingleChoiceItems(protocols, protocolIndex) { _, which -> protocolIndex = which }
+                    .setPositiveButton(android.R.string.ok) { _, _ ->
+                        savePrimaryInput(vendors[vendorIndex], protocols[protocolIndex])
+                    }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
             }
+            .setNegativeButton(android.R.string.cancel, null)
             .show()
     }
 
+    /**
+     * Converts the currently stored `sourceId` into preselected vendor/protocol indexes for the
+     * dialog UI.
+     */
+    private fun currentSelectionState(vendors: Array<String>, protocols: Array<String>): Pair<Int, Int> {
+        val sourceId = multiSourceSettings.primaryInputSourceId ?: return 0 to 0
+        val parts = sourceId.split(":")
+        if (parts.size < 2) return 0 to 0
+        val protocol = parts[0].lowercase()
+        val vendor = parts[1].lowercase()
+        val vendorIndex = vendors.indexOfFirst { it.equals(vendor, ignoreCase = true) }.takeIf { it >= 0 } ?: 0
+        val protocolIndex = protocols.indexOfFirst { it.equals(protocol, ignoreCase = true) }.takeIf { it >= 0 } ?: 0
+        return vendorIndex to protocolIndex
+    }
+
+    /**
+     * Persists the selected primary source and shows a user-facing confirmation toast.
+     *
+     * Only notification transport is implemented today. Other protocols are still accepted as a
+     * future-facing selection because the product spec wants the identity model to be ready now.
+     */
+    private fun savePrimaryInput(vendor: String, protocol: String) {
+        val transport = TransportType.fromUserValue(protocol)
+        val sourceId = SourceIdentity.buildSourceId(transport, vendor, null)
+        multiSourceSettings.primaryInputSourceId = sourceId
+
+        val message = if (transport == TransportType.NOTIFICATION) {
+            "Primary input set to $sourceId"
+        } else {
+            "Primary input set to $sourceId. Only notification is implemented now; $protocol is reserved for future work."
+        }
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+    }
+
+    /**
+     * Starts the app-scoped bug-report export and temporarily disables the report button while the
+     * export is running.
+     */
     private fun exportBugReport(uri: Uri) {
         binding.reportProgress.visibility = View.VISIBLE
         binding.menuReportBug.isEnabled = false
-
         lifecycleScope.launch {
             try {
                 BugReportExporter.export(this@SettingsMenuActivity, uri)
-                Toast.makeText(this@SettingsMenuActivity, getString(R.string.report_bug_saved), Toast.LENGTH_LONG).show()
-
-                // Optional: guide user to the system bug report UI (requires Developer Options).
-                // Many OEMs hide this unless Developer Options is enabled.
-                // If the intent fails, we silently ignore.
-                try {
-                    startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS))
-                } catch (_: Exception) {
-                    // ignore
-                }
-            } catch (e: Exception) {
+                Toast.makeText(this@SettingsMenuActivity, getString(R.string.report_bug_saved), Toast.LENGTH_SHORT).show()
+            } catch (t: Throwable) {
                 Toast.makeText(
                     this@SettingsMenuActivity,
-                    getString(R.string.report_bug_failed, e.message ?: "unknown"),
+                    getString(R.string.report_bug_failed, t.message ?: t::class.java.simpleName),
                     Toast.LENGTH_LONG
                 ).show()
             } finally {
@@ -125,12 +162,9 @@ class SettingsMenuActivity : AppCompatActivity() {
         }
     }
 
+    /** Wires the bottom navigation for the settings screen. */
     private fun setupBottomNav() {
-        // Graph: return to main graph screen.
-        binding.bottomNav.btnNavGraph.setOnClickListener {
-            finish()
-        }
-
+        binding.bottomNav.btnNavGraph.setOnClickListener { finish() }
         binding.bottomNav.btnNavStatistics.setOnClickListener {
             Toast.makeText(this, getString(R.string.future_work), Toast.LENGTH_SHORT).show()
         }
@@ -138,13 +172,11 @@ class SettingsMenuActivity : AppCompatActivity() {
             Toast.makeText(this, getString(R.string.future_work), Toast.LENGTH_SHORT).show()
         }
         binding.bottomNav.btnNavTools.setOnClickListener {
-            CalibrationDialogHelper.showCalibrationMenu(this, AppPrefs(this))
-        }
-        binding.bottomNav.btnNavSettings.setOnClickListener {
-            // Already here
+            Toast.makeText(this, getString(R.string.future_work), Toast.LENGTH_SHORT).show()
         }
     }
 
+    /** Highlights the selected bottom-nav tab. */
     private fun markSelectedTab(isSettings: Boolean) {
         val sel = 0xFF4CAF50.toInt()
         val nor = 0xFF888888.toInt()

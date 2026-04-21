@@ -10,12 +10,11 @@ import tw.yourcompany.cgmbridge.core.data.Repository
 import tw.yourcompany.cgmbridge.core.prefs.MultiSourceSettings
 
 /**
- * Handles the Version 1 primary-source disconnection rule.
+ * Handles the primary-source staleness rule for the multi-source architecture.
  *
- * If the selected primary source has no new data for more than 30 minutes:
- * - notify once for that stale episode
- * - do not auto-switch to another source
- * - allow the app to continue storing and plotting other raw sources
+ * The selected primary source is special because it drives calibration, alarms, and the mini
+ * graph. If it stops updating, the user should be told exactly once per stale episode while the
+ * app continues to store and plot all other non-primary sources on the main graph.
  */
 class PrimarySourceStalenessNotifier(
     private val context: Context,
@@ -29,11 +28,14 @@ class PrimarySourceStalenessNotifier(
     }
 
     /**
-     * Checks whether the selected primary source is stale and sends a one-shot warning if
-     * needed. Returns true when the primary source is currently stale.
+     * Checks whether the selected primary source is stale and sends a one-shot warning if needed.
+     *
+     * The method intentionally reads [MultiSourceSettings.primaryInputSourceId] instead of the
+     * older output-name alias so the code matches the product specification and stays aligned with
+     * the Settings screen.
      */
     suspend fun checkAndNotifyIfStale(nowMs: Long = System.currentTimeMillis()): Boolean {
-        val primaryId = settings.primaryOutputSourceId ?: return false
+        val primaryId = settings.primaryInputSourceId ?: return false
         val latest = repo.latestReadingForSource(primaryId) ?: return false
         val stale = nowMs - latest.timestampMs > STALE_PRIMARY_MS
         if (stale && !settings.primaryStaleNotificationActive) {
@@ -48,11 +50,14 @@ class PrimarySourceStalenessNotifier(
 
     /**
      * Clears the stale episode when a fresh primary reading is accepted by the processor.
+     *
+     * Only the sticky episode flag is reset. The timestamp remains available for diagnostics.
      */
     fun markPrimaryFresh() {
         settings.primaryStaleNotificationActive = false
     }
 
+    /** Creates and posts the user-facing stale-primary notification. */
     private fun postNotification(lastTimestampMs: Long, nowMs: Long) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

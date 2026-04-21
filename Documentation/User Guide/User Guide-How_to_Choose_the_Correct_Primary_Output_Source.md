@@ -1,4 +1,4 @@
-# How to Choose the Correct Primary Output Source
+# How to Choose the Correct Primary Input Source
 
 ## Why this guide matters
 
@@ -10,7 +10,7 @@ Examples:
 - different transport types such as Notification, Bluetooth, Broadcast, or Network
 - more than one source carrying similar glucose readings
 
-To keep the app simple and reliable, you must choose **one exact Primary Output Source**.
+To keep the app simple and reliable, you must choose **one exact Primary Input Source**.
 
 That chosen source is the one the app uses for:
 
@@ -22,9 +22,9 @@ All other sources can still be stored and shown on the main graph for comparison
 
 ---
 
-## 1. What is the Primary Output Source?
+## 1. What is the Primary Input Source?
 
-The **Primary Output Source** is one exact data source channel that you choose.
+The **Primary Input Source** is one exact data source channel that you choose.
 
 Once selected, that source becomes the only one used for:
 
@@ -36,7 +36,7 @@ All other sources still remain available as reference data on the main graph.
 
 ---
 
-## 2. What happens after you choose a Primary Output Source?
+## 2. What happens after you choose a Primary Input Source?
 
 ### The selected primary source
 The selected source will:
@@ -76,10 +76,10 @@ This helps you compare:
 ## Mini graph
 The mini graph is for focused viewing.
 
-It shows only the selected Primary Output Source.
+It shows only the selected Primary Input Source.
 
-- if calibration is enabled, the mini graph shows calibrated primary output
-- if calibration is disabled, the mini graph shows raw primary output
+- if calibration is enabled, the mini graph shows calibrated primary Input
+- if calibration is disabled, the mini graph shows raw primary Input
 
 ---
 
@@ -101,11 +101,11 @@ Also, the same physical CGM may be able to send data through more than one trans
 
 Because of this, the app does **not** try to guess which source is physically the same CGM.
 
-Only you can decide which source should be treated as the Primary Output Source.
+Only you can decide which source should be treated as the Primary Input Source.
 
 ---
 
-## 5. How to choose the correct Primary Output Source
+## 5. How to choose the correct Primary Input Source
 
 Choose the source that you want the app to trust for:
 
@@ -140,7 +140,7 @@ Examples:
 
 The app will still show all of them on the main graph.
 
-You must choose exactly one source as the Primary Output Source.
+You must choose exactly one source as the Primary Input Source.
 
 ---
 
@@ -164,7 +164,7 @@ Use this information to identify the source you want to trust as the primary one
 
 ## 8. What happens if the primary source stops updating?
 
-If the selected Primary Output Source does not receive new data for more than **30 minutes**:
+If the selected Primary Input Source does not receive new data for more than **30 minutes**:
 
 - the app will send a notification
 - the app will **not** automatically switch to another source
@@ -183,7 +183,7 @@ If you are not sure, use this process:
 1. open the main graph
 2. compare which source updates more reliably
 3. compare which source best reflects the CGM data you want to follow
-4. choose that source as the Primary Output Source
+4. choose that source as the Primary Input Source
 5. if needed, change your choice later in settings
 
 You can use the main graph as a comparison view before deciding.
@@ -192,7 +192,7 @@ You can use the main graph as a comparison view before deciding.
 
 ## 10. Recommended decision checklist
 
-Before selecting a Primary Output Source, ask yourself:
+Before selecting a Primary Input Source, ask yourself:
 
 - Which source updates most consistently?
 - Which source disconnects least often?
@@ -206,7 +206,7 @@ If you can answer these clearly, you can make a better primary-source choice.
 
 ## 11. Simple summary
 
-### The selected Primary Output Source is used for:
+### The selected Primary Input Source is used for:
 
 - mini graph
 - calibration
@@ -232,4 +232,4 @@ Choose the source that is the most reliable for your own real usage.
 The main graph helps you compare all available sources.
 The mini graph, calibration, and alarms should follow only the one source that you trust most.
 
-That is the meaning of the Primary Output Source in this app.
+That is the meaning of the Primary Input Source in this app.

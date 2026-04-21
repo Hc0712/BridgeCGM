@@ -10,17 +10,15 @@ import tw.yourcompany.cgmbridge.feature.alarm.PrimarySourceStalenessNotifier
 import tw.yourcompany.cgmbridge.feature.calibration.CalibrationSettings
 
 /**
- * Shared production processor for all normalized readings.
+ * Shared production processor for normalized readings from any transport.
  *
- * Pipeline responsibilities:
- * 1) ensure source registry row exists
- * 2) run per-source deduplication
- * 3) apply calibration only to the selected primary output source
- * 4) persist the reading row
- * 5) leave alarm triggering to the caller for the primary source only
- *
- * This class intentionally does not perform transport-specific parsing. That work stays
- * in adapters so Bluetooth/Broadcast/Network can plug in later with the same contract.
+ * This class now contains explicit multi-source comments because it is the central place where the
+ * product rules meet the persisted data model:
+ * - dedupe is per source only;
+ * - calibration is primary-source-only;
+ * - a fresh primary reading clears the stale-primary episode;
+ * - all sources, including non-primary ones, are still stored and remain eligible for the main
+ *   graph.
  */
 class MultiSourceReadingProcessor(
     private val repo: Repository,
@@ -32,11 +30,24 @@ class MultiSourceReadingProcessor(
     companion object {
         /**
          * Same-source dedup window.
-         * Production requirement: dedupe must be per source, never cross-source.
+         *
+         * This window must never be applied across different sources. Two vendors may publish a
+         * value at nearly the same time and both readings must survive so the main graph can
+         * compare them side by side.
          */
         private const val PER_SOURCE_DEDUP_WINDOW_MS = 50_000L
     }
 
+    /**
+     * Processes one already-normalized reading.
+     *
+     * Steps:
+     * 1. ensure the source registry row exists;
+     * 2. suppress only same-source rapid duplicates;
+     * 3. apply calibration only when the reading belongs to the selected primary input source;
+     * 4. store the row;
+     * 5. mark the primary source fresh so stale-source notifications can be cleared.
+     */
     suspend fun process(reading: NormalizedReading): BgReadingEntity? {
         sourceRegistryService.ensureRegistered(reading)
 
@@ -45,7 +56,7 @@ class MultiSourceReadingProcessor(
             return null
         }
 
-        val primaryId = multiSourceSettings.primaryOutputSourceId
+        val primaryId = multiSourceSettings.primaryInputSourceId
         val isPrimary = !primaryId.isNullOrBlank() && primaryId == reading.sourceId
         val calibrated = if (isPrimary && appPrefs.calibrationEnabled) {
             CalibrationSettings.apply(reading.valueMgdl, appPrefs)
@@ -75,10 +86,9 @@ class MultiSourceReadingProcessor(
     /**
      * Per-source dedupe rule.
      *
-     * Why this matters:
-     * Two different vendors or transport paths may emit equal glucose values at nearly the
-     * same time. Those rows must both survive. We only suppress duplicates when the same
-     * source channel repeats inside the same short gap.
+     * This function purposely looks up only the latest row for the same `sourceId`. Using a global
+     * latest reading would reintroduce the original bug where one vendor could suppress another
+     * vendor's valid reading simply because both arrived close together.
      */
     private suspend fun isDuplicateForSameSource(reading: NormalizedReading): Boolean {
         val latest = repo.latestReadingForSource(reading.sourceId) ?: return false

@@ -4,16 +4,27 @@ import tw.yourcompany.cgmbridge.core.db.BgReadingEntity
 import tw.yourcompany.cgmbridge.core.db.CgmSourceEntity
 
 /**
- * Helper for building graph series in the clean multi-source-first project.
+ * Pure helper for turning stored rows into graph-ready logical series.
  *
- * Main graph:
- * - all visible raw sources
- * - plus calibrated overlay for the primary source when calibration is enabled
+ * Responsibilities:
+ * - build one raw series per visible source for the main graph;
+ * - add one extra calibrated overlay for the selected primary source when calibration is on;
+ * - build exactly one primary-only series for the mini graph.
  *
- * Mini graph:
- * - only the primary source
+ * The object deliberately does not know anything about MPAndroidChart. That keeps the business
+ * rules testable and makes the chart renderer simpler.
  */
 object MultiSourceChartSupport {
+    /**
+     * One logical graph series before it is turned into a chart-library dataset.
+     *
+     * @param sourceId            stable source identifier owning the rows
+     * @param label               human-readable legend label
+     * @param colorArgb           stable display color for the series
+     * @param useCalibratedValue  `true` when the chart should read `calibratedValueMgdl`
+     *                            instead of `calculatedValueMgdl`
+     * @param rows                time-ordered rows that belong to this series
+     */
     data class GraphSeries(
         val sourceId: String,
         val label: String,
@@ -25,9 +36,11 @@ object MultiSourceChartSupport {
     /**
      * Builds the main-graph series list.
      *
-     * Behavior:
-     * - every visible source gets one raw series
-     * - the primary source gets an additional calibrated series only when calibration is on
+     * Rules:
+     * - every visible and enabled source receives one raw series;
+     * - the selected primary source receives one additional calibrated series only when
+     *   calibration is enabled;
+     * - the returned rows are sorted oldest -> newest for chart rendering.
      */
     fun buildMainGraphSeries(
         rows: List<BgReadingEntity>,
@@ -44,7 +57,7 @@ object MultiSourceChartSupport {
             val ordered = sourceRows.sortedBy { it.timestampMs }
             result += GraphSeries(
                 sourceId = sourceId,
-                label = "${source.vendorName} / ${source.transportType} / Raw",
+                label = "${source.vendorName} / ${source.transportType.lowercase()} / Raw",
                 colorArgb = source.colorArgb,
                 useCalibratedValue = false,
                 rows = ordered
@@ -52,7 +65,7 @@ object MultiSourceChartSupport {
             if (calibrationEnabled && primaryOutputSourceId == sourceId) {
                 result += GraphSeries(
                     sourceId = sourceId,
-                    label = "${source.vendorName} / ${source.transportType} / Calibrated",
+                    label = "${source.vendorName} / ${source.transportType.lowercase()} / Calibrated",
                     colorArgb = source.colorArgb,
                     useCalibratedValue = true,
                     rows = ordered
@@ -64,6 +77,9 @@ object MultiSourceChartSupport {
 
     /**
      * Builds the single mini-graph series according to the production rule.
+     *
+     * If there is no selected source or no rows for that source, the function returns `null` and
+     * the UI should clear the mini graph instead of drawing a mixed-source line.
      */
     fun buildMiniGraphSeries(
         rows: List<BgReadingEntity>,

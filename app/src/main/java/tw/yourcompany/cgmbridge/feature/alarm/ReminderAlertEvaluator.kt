@@ -5,38 +5,39 @@ import tw.yourcompany.cgmbridge.core.data.Repository
 import tw.yourcompany.cgmbridge.core.logging.DebugCategory
 import tw.yourcompany.cgmbridge.core.logging.DebugTrace
 import tw.yourcompany.cgmbridge.core.prefs.AppPrefs
+import tw.yourcompany.cgmbridge.core.prefs.MultiSourceSettings
 
 /**
  * Central alarm state machine for Bridge.
  *
- * This implementation intentionally separates three concerns that were formerly
- * mixed together:
- *  1. Decide which alarm kind, if any, currently owns the glucose state.
- *  2. Maintain persistent runtime state so interval-based replays survive
- *     process death / reboot.
- *  3. Trigger or suppress sound playback strictly according to the values shown
- *     on the Reminder Setting screen.
+ * This file was updated so the alarm engine now follows the multi-source product rule exactly:
+ * only the selected primary input source is allowed to drive reminders.
  *
- * Priority order matches the existing Bridge behavior and common CGM practice:
- * urgent low wins over low, and low wins over high. Only one glucose alarm kind
- * can be active at a time.
+ * That means the evaluator must not look at the latest global reading when multiple vendors are
+ * active, otherwise a non-primary source could trigger an alarm unexpectedly.
  */
 object ReminderAlertEvaluator {
 
     /**
-     * Evaluates the latest stored glucose reading and updates alarm runtime state.
+     * Evaluates the latest relevant glucose reading and updates alarm runtime state.
      *
-     * Call this in two situations:
-     *  - immediately after a new BG reading is inserted, so a newly crossed
-     *    threshold alarms right away;
-     *  - when a replay alarm fires, so the engine can decide whether to repeat,
-     *    suppress, or clear the active state after recovery.
+     * Source-selection rule:
+     * - if the user selected a primary input source, evaluate only that source;
+     * - otherwise, fall back to the previous global-latest behavior so the app remains usable
+     *   before the user makes an explicit source selection.
      */
     suspend fun evaluateAndTrigger(context: Context) {
         val prefs = AppPrefs(context)
-        val latest = Repository(context).latestReadings(1).firstOrNull()
+        val repo = Repository(context)
+        val multiSourceSettings = MultiSourceSettings(context)
+        val primaryId = multiSourceSettings.primaryInputSourceId
+        val latest = if (!primaryId.isNullOrBlank()) {
+            repo.latestReadingForSource(primaryId)
+        } else {
+            repo.latestReadings(1).firstOrNull()
+        }
         if (latest == null) {
-            DebugTrace.t(DebugCategory.ALARM, "ALARM-EVAL", "no readings")
+            DebugTrace.t(DebugCategory.ALARM, "ALARM-EVAL", "no readings for primary=$primaryId")
             clearAll(context, prefs)
             return
         }
@@ -49,19 +50,17 @@ object ReminderAlertEvaluator {
         DebugTrace.t(
             DebugCategory.ALARM,
             "ALARM-EVAL",
-            "latest=$latestMgdl winner=${winner?.kind} rules=" + rules.joinToString { rule ->
+            "primary=$primaryId latest=$latestMgdl winner=${winner?.kind} rules=" + rules.joinToString { rule ->
                 "${rule.kind}(enabled=${rule.enabled},active=${rule.active},threshold=${rule.thresholdMgdl},intervalMin=${rule.intervalMin},durationSec=${rule.durationSec},next=${rule.nextTriggerAtMs})"
             }
         )
 
         if (winner == null) {
-            DebugTrace.t(DebugCategory.ALARM, "ALARM-CLEAR", "no threshold crossed latest=$latestMgdl")
+            DebugTrace.t(DebugCategory.ALARM, "ALARM-CLEAR", "no threshold crossed latest=$latestMgdl primary=$primaryId")
             clearAll(context, prefs)
             return
         }
 
-        // Keep only the winning alarm active. This prevents low + urgent-low from
-        // both replaying for the same reading window.
         for (rule in rules) {
             if (rule.kind != winner.kind) {
                 clearOne(context, prefs, rule)
@@ -100,7 +99,11 @@ object ReminderAlertEvaluator {
         AlarmSoundPlayer.stop()
     }
 
-    /** Clears exactly one alarm kind and cancels its replay timer. */
+    /**
+     * Clears exactly one alarm kind and cancels its replay timer.
+     *
+     * The logging condition avoids noisy traces when nothing needs to be cleared.
+     */
     fun clearOne(context: Context, prefs: AppPrefs, rule: AlarmRule) {
         if (rule.active || rule.nextTriggerAtMs > 0L || rule.lastTriggeredAtMs > 0L) {
             DebugTrace.t(DebugCategory.ALARM, "ALARM-CLEAR-ONE", "Clearing ${rule.kind}")

@@ -5,6 +5,8 @@ import tw.yourcompany.cgmbridge.core.db.BgReadingEntity
 import tw.yourcompany.cgmbridge.core.model.GlucoseSample
 import tw.yourcompany.cgmbridge.core.prefs.AppPrefs
 import tw.yourcompany.cgmbridge.core.prefs.MultiSourceSettings
+import tw.yourcompany.cgmbridge.core.source.SourceIdentity
+import tw.yourcompany.cgmbridge.core.source.TransportType
 import tw.yourcompany.cgmbridge.feature.alarm.PrimarySourceStalenessNotifier
 import tw.yourcompany.cgmbridge.feature.input.pipeline.MultiSourceReadingProcessor
 import tw.yourcompany.cgmbridge.feature.input.pipeline.NormalizedReading
@@ -13,10 +15,10 @@ import tw.yourcompany.cgmbridge.feature.input.pipeline.SourceRegistryService
 /**
  * Notification importer backed by the shared multi-source processor.
  *
- * Compatibility note:
- * Older notification-listener code still expects a sealed [ImportResult] with detailed
- * reasons for skipped inserts. We keep that shape here while delegating actual storage
- * to the new multi-source processor.
+ * The importer performs a small amount of transport-specific normalization before the reading
+ * enters the shared pipeline. That is the right place for the source-identity fix because this
+ * class still receives samples from older parser code paths and therefore needs one final
+ * defense-in-depth check.
  */
 class BgReadingImporter(
     private val repo: Repository,
@@ -32,6 +34,7 @@ class BgReadingImporter(
         stalenessNotifier = stalenessNotifier
     )
 
+    /** Result shape kept for compatibility with older notification-listener callers. */
     sealed class ImportResult {
         data class Inserted(val entity: BgReadingEntity) : ImportResult()
         data class IgnoredDuplicate(val timestampMs: Long) : ImportResult()
@@ -41,6 +44,13 @@ class BgReadingImporter(
         data class StatusOnly(val status: String?, val alert: String?) : ImportResult()
     }
 
+    /**
+     * Validates, normalizes, and imports one notification-derived sample.
+     *
+     * The method deliberately normalizes the source identity again even though the parser now does
+     * the same thing. This extra step makes the importer robust against any future caller that
+     * accidentally constructs a `GlucoseSample` via the old legacy constructor.
+     */
     suspend fun import(sample: GlucoseSample): ImportResult {
         if (sample.timestampMs <= 0L) return ImportResult.InvalidTimestamp(sample.timestampMs)
         if (sample.valueMgdl !in 20..600) {
@@ -51,7 +61,11 @@ class BgReadingImporter(
             }
         }
 
-        val latest = repo.latestReadingForSource(sample.sourceId)
+        val transport = normalizeTransport(sample.transportType)
+        val vendor = normalizeVendor(sample)
+        val sourceId = SourceIdentity.buildSourceId(transport, vendor, sample.originKey)
+
+        val latest = repo.latestReadingForSource(sourceId)
         if (latest != null) {
             if (latest.timestampMs == sample.timestampMs) return ImportResult.IgnoredDuplicate(sample.timestampMs)
             val gapMs = sample.timestampMs - latest.timestampMs
@@ -59,9 +73,9 @@ class BgReadingImporter(
         }
 
         val normalized = NormalizedReading(
-            sourceId = sample.sourceId,
-            transportType = sample.transportType,
-            vendorName = sample.vendorName,
+            sourceId = sourceId,
+            transportType = transport.name,
+            vendorName = vendor,
             originKey = sample.originKey,
             timestampMs = sample.timestampMs,
             valueMgdl = sample.valueMgdl,
@@ -73,4 +87,24 @@ class BgReadingImporter(
         val inserted = processor.process(normalized)
         return inserted?.let { ImportResult.Inserted(it) } ?: ImportResult.IgnoredDuplicate(sample.timestampMs)
     }
+
+    /**
+     * Normalizes the vendor name part of the source identity.
+     *
+     * Preference order:
+     * 1. already-normalized `sample.vendorName` if it is one of the known vendors,
+     * 2. package-to-vendor mapping for legacy samples that still carry a package-like value,
+     * 3. sanitized raw value or `unknown` as a last resort.
+     */
+    private fun normalizeVendor(sample: GlucoseSample): String {
+        val direct = sample.vendorName.trim().lowercase()
+        return when {
+            direct in setOf("aidex", "ottai", "dexcom") -> direct
+            sample.sourcePackage.startsWith("com.") -> SupportedPackages.vendorForPackage(sample.sourcePackage)
+            else -> direct.ifBlank { "unknown" }
+        }
+    }
+
+    /** Converts any external transport string into the normalized transport enum. */
+    private fun normalizeTransport(raw: String?): TransportType = TransportType.fromUserValue(raw)
 }

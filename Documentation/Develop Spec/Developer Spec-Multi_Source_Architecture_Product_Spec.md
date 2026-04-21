@@ -8,12 +8,12 @@ The goal is to let the app:
 
 - accept multiple incoming glucose data sources
 - store all incoming data for plotting and comparison
-- let the user choose **one exact primary output source**
-- apply calibration only to that primary output source
-- use only that primary output source for alarms
+- let the user choose **one exact primary input source**
+- apply calibration only to that primary input source
+- use only that primary input source for alarms
 - show all sources on the main graph
-- show only the primary output on the mini graph
-- notify the user if the primary output source becomes stale for more than 30 minutes
+- show only the primary input on the mini graph
+- notify the user if the primary input source becomes stale for more than 30 minutes
 
 This version intentionally avoids automatic source failover to keep the architecture simple, predictable, and reliable for long-running operation.
 
@@ -27,12 +27,12 @@ This version intentionally avoids automatic source failover to keep the architec
 - normalized input pipeline
 - notification input adapter implemented now
 - Bluetooth, Broadcast, and Network adapter framework reserved for future work
-- one user-selected **primary output source**
-- calibration applied only to the primary output source
-- alarms driven only by the calibrated primary output source
+- one user-selected **primary input source**
+- calibration applied only to the primary input source
+- alarms driven only by the calibrated primary input source
 - main graph plots all sources
 - main graph also plots both raw and calibrated data for the primary source when calibration is enabled
-- mini graph plots only the primary output source
+- mini graph plots only the primary input source
 - stale-primary notification after 30 minutes without new primary data
 
 ### Explicitly excluded from Version 1
@@ -59,13 +59,13 @@ Examples:
 
 A source channel is the unit that the app can detect, store, and select.
 
-### 3.2 Primary Output Source
-The **Primary Output Source** is one exact source channel selected by the user.
+### 3.2 Primary input Source
+The **Primary input Source** is one exact source channel selected by the user.
 
 It is stored internally as:
 
 ```text
-primaryOutputSourceId
+primaryInputSourceId
 ```
 
 ### 3.3 Raw Data
@@ -74,17 +74,17 @@ Raw data is the parsed glucose value before calibration.
 ### 3.4 Calibrated Data
 Calibrated data is the result of applying the existing calibration algorithm to the raw value.
 
-In Version 1, calibration applies only to the primary output source.
+In Version 1, calibration applies only to the primary input source.
 
 ### 3.5 Stale Primary Source
-A primary source is considered **stale** when no new reading has been received from the selected `primaryOutputSourceId` for more than **30 minutes**.
+A primary source is considered **stale** when no new reading has been received from the selected `primaryInputSourceId` for more than **30 minutes**.
 
 ---
 
 ## 4. Core Product Rules
 
-### 4.1 One exact primary output source
-The user selects one exact source channel as the Primary Output Source.
+### 4.1 One exact primary input source
+The user selects one exact source channel as the Primary input Source.
 
 The UI may show sources using:
 
@@ -97,7 +97,7 @@ However, the saved selection must be the exact `sourceId`.
 ### 4.2 Unified source roles in Version 1
 In Version 1, the following roles are locked together:
 
-- primary output source
+- primary input source
 - calibration target
 - alarm target
 - mini graph source
@@ -105,7 +105,7 @@ In Version 1, the following roles are locked together:
 That means:
 
 ```text
-primaryOutputSourceId
+primaryInputSourceId
 = calibration target
 = alarm source
 = mini graph source
@@ -122,7 +122,7 @@ All non-primary sources must:
 - not appear on the mini graph
 
 ### 4.4 Stale primary handling
-If the primary output source has not updated for more than 30 minutes:
+If the primary input source has not updated for more than 30 minutes:
 
 - the app sends one user notification for that stale episode
 - the app does not auto-switch to another source
@@ -131,7 +131,7 @@ If the primary output source has not updated for more than 30 minutes:
 ### 4.5 No automatic identity inference
 The app must not assume that two sources are physically the same CGM simply because they share the same vendor or similar data.
 
-Only the user decides which exact source channel should be treated as the Primary Output Source.
+Only the user decides which exact source channel should be treated as the Primary input Source.
 
 ---
 
@@ -283,10 +283,10 @@ This preserves distinct source lines even when two sources produce very similar 
 ## 9. Calibration Rules
 
 ## 9.1 Version 1 calibration scope
-Calibration applies only to the selected `primaryOutputSourceId`.
+Calibration applies only to the selected `primaryInputSourceId`.
 
 ## 9.2 Insert-time behavior
-### If `reading.sourceId == primaryOutputSourceId`
+### If `reading.sourceId == primaryInputSourceId`
 - if calibration is enabled:
   - `calculatedValueMgdl = raw parsed value`
   - `calibratedValueMgdl = calibrated result`
@@ -294,7 +294,7 @@ Calibration applies only to the selected `primaryOutputSourceId`.
   - `calculatedValueMgdl = raw parsed value`
   - `calibratedValueMgdl = raw parsed value`
 
-### If `reading.sourceId != primaryOutputSourceId`
+### If `reading.sourceId != primaryInputSourceId`
 - `calculatedValueMgdl = raw parsed value`
 - `calibratedValueMgdl = raw parsed value`
 
@@ -305,14 +305,14 @@ This means non-primary sources are stored without additional handling.
 ## 10. Alarm Rules
 
 ## 10.1 Version 1 alarm source
-Only the calibrated primary output source may drive the alarm engine.
+Only the calibrated primary input source may drive the alarm engine.
 
 ## 10.2 Alarm flow
 ```text
-primary output source
+primary input source
 → calibration applied if enabled
-→ calibrated primary output
-→ existing alarm logic evaluates calibrated primary output
+→ calibrated primary input
+→ existing alarm logic evaluates calibrated primary input
 ```
 
 ## 10.3 Non-primary sources
@@ -336,11 +336,11 @@ The main graph must plot:
 - If calibration is disabled, the app must not plot a duplicate calibrated line identical to the raw primary line.
 
 ## 11.2 Mini graph
-The mini graph must plot only the primary output source.
+The mini graph must plot only the primary input source.
 
 ### Mini graph behavior rules
-- If calibration is enabled: plot calibrated primary output data.
-- If calibration is disabled: plot raw primary output data.
+- If calibration is enabled: plot calibrated primary input data.
+- If calibration is disabled: plot raw primary input data.
 - No non-primary source appears on the mini graph.
 
 ## 11.3 Visual styling recommendations
@@ -362,7 +362,7 @@ Example legend labels:
 ## 12. User Selection Flow
 
 ## 12.1 User-facing selection logic
-The user should select the primary output source from a list of detected source channels.
+The user should select the primary input source from a list of detected source channels.
 
 Each selectable item should show:
 
@@ -376,7 +376,7 @@ Each selectable item should show:
 The final selection must be saved as:
 
 ```text
-primaryOutputSourceId
+primaryInputSourceId
 ```
 
 ## 12.3 Source Management screen
@@ -385,9 +385,9 @@ Use a dedicated source-selection screen rather than putting all logic directly o
 Suggested flow:
 
 - `SettingsMenuActivity`
-  - opens **Source Management** or **Primary Output Selection** screen
+  - opens **Source Management** or **Primary input Selection** screen
 - user selects one exact source
-- user taps **Set as Primary Output**
+- user taps **Set as Primary input**
 
 ---
 
@@ -437,11 +437,11 @@ Retention should remain configurable if product requirements change.
 Version 1 uses a simple but reliable architecture:
 
 - one normalized multi-source input pipeline
-- one exact primary output source selected by the user
-- calibration only on the primary output source
-- alarms only from the calibrated primary output source
+- one exact primary input source selected by the user
+- calibration only on the primary input source
+- alarms only from the calibrated primary input source
 - main graph shows all raw sources plus calibrated overlay for the primary source when enabled
-- mini graph shows only the primary output source
+- mini graph shows only the primary input source
 - stale primary for over 30 minutes causes notification only
 - no automatic source failover
 

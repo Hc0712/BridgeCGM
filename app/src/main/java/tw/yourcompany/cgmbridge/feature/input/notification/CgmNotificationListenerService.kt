@@ -20,10 +20,12 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import tw.yourcompany.cgmbridge.core.data.Repository
 import tw.yourcompany.cgmbridge.core.prefs.AppPrefs
+import tw.yourcompany.cgmbridge.core.prefs.MultiSourceSettings
 import tw.yourcompany.cgmbridge.core.logging.DebugCategory
 import tw.yourcompany.cgmbridge.core.logging.DebugTrace
 import tw.yourcompany.cgmbridge.feature.output.xdrip.XDripBroadcastSender
 import tw.yourcompany.cgmbridge.feature.alarm.ReminderAlertEvaluator
+import tw.yourcompany.cgmbridge.feature.alarm.PrimarySourceStalenessNotifier
 import tw.yourcompany.cgmbridge.feature.keepalive.NotificationPollScheduler
 
 /**
@@ -84,6 +86,12 @@ class CgmNotificationListenerService : NotificationListenerService() {
     /** PowerManager for WakeLock acquisition during processing. */
     private lateinit var powerManager: PowerManager
 
+    /** Clean Version 1 multi-source settings (primaryOutputSourceId, stale flags). */
+    private lateinit var multiSourceSettings: MultiSourceSettings
+
+    /** Notifier that reports primary-source disconnection without auto switching. */
+    private lateinit var stalenessNotifier: PrimarySourceStalenessNotifier
+
     /**
      * Initializes repository, parser, and keep-alive infrastructure.
      *
@@ -95,7 +103,9 @@ class CgmNotificationListenerService : NotificationListenerService() {
         super.onCreate()
         repo = Repository(applicationContext)
         prefs = AppPrefs(applicationContext)
-        importer = BgReadingImporter(repo, prefs)
+        multiSourceSettings = MultiSourceSettings(applicationContext)
+        stalenessNotifier = PrimarySourceStalenessNotifier(applicationContext, multiSourceSettings, repo)
+        importer = BgReadingImporter(repo, prefs, multiSourceSettings, stalenessNotifier)
         parser = GenericCgmNotificationParser()
         powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         DebugTrace.t(DebugCategory.NOTIFICATION, "NL-CREATE", "Notification listener created")
@@ -274,7 +284,7 @@ class CgmNotificationListenerService : NotificationListenerService() {
                         } else {
                             sample.direction
                         }
-                        val broadcastSample = sample.copy(valueMgdl = result.entity.CalibratedValueMgdl, direction = effectiveDir)
+                        val broadcastSample = sample.copy(valueMgdl = result.entity.calibratedValueMgdl, direction = effectiveDir)
 
                         repo.log(
                             "D",
@@ -287,7 +297,7 @@ class CgmNotificationListenerService : NotificationListenerService() {
                             "[DATABASE] BgReadingEntity: " +
                             "timestampMs=${result.entity.timestampMs}, " +
                             "calculatedValueMgdl=${result.entity.calculatedValueMgdl}, " +
-                            "CalibratedValueMgdl=${result.entity.CalibratedValueMgdl}, " +
+                            "calibratedValueMgdl=${result.entity.calibratedValueMgdl}, " +
                             "direction=${result.entity.direction}, " +
                             "sourcePackage=${result.entity.sourcePackage}, " +
                             "rawText=${result.entity.rawText}, " +

@@ -136,7 +136,7 @@ object SlopeDirectionCalculator {
 
         // xDrip: slope = (prev - current) / (prev_ts - current_ts)  → positive when rising
         // Equivalent: (current - prev) / (current_ts - prev_ts) → same sign
-        val valueDelta = current.CalibratedValueMgdl.toDouble() - previous.CalibratedValueMgdl.toDouble()
+        val valueDelta = current.calibratedValueMgdl.toDouble() - previous.calibratedValueMgdl.toDouble()
         val minutesDelta = timeDeltaMs.toDouble() / 60_000.0
         val slopePerMinute = valueDelta / minutesDelta
 
@@ -153,8 +153,8 @@ object SlopeDirectionCalculator {
             DebugCategory.PARSING,
             "SLOPE-CALC"
         ) {
-            "curr=${current.CalibratedValueMgdl}@${current.timestampMs} " +
-            "prev=${previous.CalibratedValueMgdl}@${previous.timestampMs} " +
+            "curr=${current.calibratedValueMgdl}@${current.timestampMs} " +
+            "prev=${previous.calibratedValueMgdl}@${previous.timestampMs} " +
             "Δ=${valueDelta}mg/dL over ${"%.1f".format(minutesDelta)}min " +
             "slope=${"%.3f".format(slopePerMinute)}/min " +
             "delta5=${"%.1f".format(deltaPerFiveMin)}mg/dL " +

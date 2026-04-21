@@ -41,7 +41,7 @@ object ReminderAlertEvaluator {
             return
         }
 
-        val latestMgdl = latest.CalibratedValueMgdl.toDouble()
+        val latestMgdl = latest.calibratedValueMgdl.toDouble()
         val now = System.currentTimeMillis()
         val rules = AlarmConfig.all(prefs)
         val winner = rules.firstOrNull { it.enabled && it.shouldTrigger(latestMgdl) }

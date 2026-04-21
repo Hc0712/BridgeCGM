@@ -224,7 +224,7 @@ class MainActivity : AppCompatActivity() {
         val latest = list.maxBy { it.timestampMs }
 
         // ── BG Value ──
-        val mgdl = latest.CalibratedValueMgdl
+        val mgdl = latest.calibratedValueMgdl
         val displayValue = if (currentOutputUnit == "mmol") {
             GlucoseUnitConverter.mgdlToMmolString(mgdl)
         } else {

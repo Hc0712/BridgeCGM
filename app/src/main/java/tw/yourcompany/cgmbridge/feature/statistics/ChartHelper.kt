@@ -271,7 +271,7 @@ object ChartHelper {
         }
 
         fun calibratedY(row: BgReadingEntity): Float {
-            val value = row.CalibratedValueMgdl.toFloat()
+            val value = row.calibratedValueMgdl.toFloat()
             return if (isMmol) value / MMOL_FACTOR.toFloat() else value
         }
 
@@ -298,7 +298,7 @@ object ChartHelper {
 
         val lineData = if (showCalibrationOverlay && !isOverview) {
             val calibratedEntries = ordered.map { row ->
-                Entry(toXValue(row.timestampMs, dayStartMs), calibratedY(row)).apply { data = row.CalibratedValueMgdl }
+                Entry(toXValue(row.timestampMs, dayStartMs), calibratedY(row)).apply { data = row.calibratedValueMgdl }
             }
             val calibratedDataSet = LineDataSet(calibratedEntries, chart.context.getString(R.string.legend_calibrated_data)).apply {
                 color = COLOR_CALIBRATED_SERIES
@@ -449,7 +449,7 @@ object ChartHelper {
         val isMmol = outputUnit == "mmol"
         val allValuesMgdl = buildList {
             list.forEach { row ->
-                add(row.CalibratedValueMgdl.toDouble())
+                add(row.calibratedValueMgdl.toDouble())
                 if (showCalibrationOverlay) add(row.calculatedValueMgdl.toDouble())
             }
         }

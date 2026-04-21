@@ -85,7 +85,7 @@ object GlucoseVariabilityCalculator {
     ): Result? {
         if (readings.isEmpty()) return null
 
-        val values = readings.map { it.CalibratedValueMgdl.toDouble() }
+        val values = readings.map { it.calibratedValueMgdl.toDouble() }
         val count = values.size
         val mean = values.average()
 

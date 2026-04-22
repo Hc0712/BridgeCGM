@@ -100,7 +100,7 @@
     <string name="stat_range_label_dynamic">Range(in/high/low) between %1$s and %2$s :</string>
     <string name="stat_hba1c_value">%1$.1f%%</string>
     <string name="stat_range_value">%1$.1f%% / %2$.1f%% / %3$.1f%%</string>
-    <string name="no_primary_input">No primary input, Please Set. -> INPUT SETTING</string>
+    <string name="no_primary_input">No primary input Please Set.->INPUT SETTING</string>
     <string name="no_optional_inputs">No optional inputs</string>
-    <string name="alarm_notice_input_setting">需至Set. -> INPUT SETTING 設定後才能警報</string>
+    <string name="alarm_notice_input_setting">需至 Set.->INPUT SETTING 設定後才能警報</string>
 </resources>

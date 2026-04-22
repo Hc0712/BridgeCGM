@@ -291,6 +291,7 @@ class MainActivity : AppCompatActivity() {
      * Renders the main graph with all visible sources.
      */
     private fun renderDetailChart(list: List<BgReadingEntity>) {
+        val (lowAlarmLabel, highAlarmLabel) = getAlarmLabels(forMainGraph = true)
         ChartHelper.renderDetail(
             binding.glucoseChartDetail,
             list,
@@ -302,7 +303,9 @@ class MainActivity : AppCompatActivity() {
             primarySourceId,
             prefs.calibrationEnabled,
             prefs.dLowBlood,
-            prefs.dHighBlood
+            prefs.dHighBlood,
+            lowAlarmLabel,
+            highAlarmLabel
         )
     }
 
@@ -311,6 +314,7 @@ class MainActivity : AppCompatActivity() {
      */
     private fun renderOverview() {
         val data = if (overviewCache.isNotEmpty()) overviewCache else latestReadingsCache
+        val (lowAlarmLabel, highAlarmLabel) = getAlarmLabels(forMainGraph = false)
         ChartHelper.renderOverview(
             binding.glucoseChartOverview,
             data,
@@ -322,8 +326,29 @@ class MainActivity : AppCompatActivity() {
             primarySourceId,
             prefs.calibrationEnabled,
             prefs.dLowBlood,
-            prefs.dHighBlood
+            prefs.dHighBlood,
+            lowAlarmLabel,
+            highAlarmLabel
         )
+    }
+
+    /**
+     * Returns the correct alarm line labels for the chart, based on alarm enabled state and primary input.
+     *
+     * @param forMainGraph true for main graph (detail), false for mini graph (overview)
+     */
+    private fun getAlarmLabels(forMainGraph: Boolean): Pair<String, String> {
+        if (!forMainGraph) {
+            // Mini graph: always fixed labels
+            return "Low Alarm" to "High Alarm"
+        }
+        val lineBreak = '\u2028'.toString() // Unicode line separator
+        val noPrimary = primarySourceId.isNullOrBlank()
+        val lowEnabled = prefs.alarmLowEnabled && !noPrimary
+        val highEnabled = prefs.alarmHighEnabled && !noPrimary
+        val lowLabel = if (lowEnabled) "Low Alarm$lineBreak(Enabled)" else "Low Alarm$lineBreak(Disabled)"
+        val highLabel = if (highEnabled) "High Alarm$lineBreak(Enabled)" else "High Alarm$lineBreak(Disabled)"
+        return lowLabel to highLabel
     }
 
     /**
@@ -440,7 +465,7 @@ class MainActivity : AppCompatActivity() {
         val primarySource = sourcesCache.firstOrNull { it.sourceId == primarySourceId }
         val calibrationEnabled = prefs.calibrationEnabled
 
-        // Build label for primary input
+        // Build label for primary input with bold prefix
         val primaryLabel = if (primarySource != null) {
             if (calibrationEnabled) {
                 "${primarySource.vendorName} / ${primarySource.transportType.lowercase()} / Calibrated"
@@ -450,7 +475,9 @@ class MainActivity : AppCompatActivity() {
         } else {
             getString(R.string.no_primary_input)
         }
-        binding.uiPrimaryInputStatus.text = primaryLabel
+        val primaryPrefix = "<b>Primary Input : </b>"
+        val primaryHtml = primaryPrefix + primaryLabel
+        binding.uiPrimaryInputStatus.text = android.text.Html.fromHtml(primaryHtml, android.text.Html.FROM_HTML_MODE_LEGACY)
 
         // Build labels for all other enabled and visible sources (excluding primary)
         val optionalSources = sourcesCache

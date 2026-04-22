@@ -132,11 +132,17 @@ object ChartHelper {
     }
 
     /**
-     * Renders the main chart.
+     * Renders the main chart (detail graph).
      *
      * The chart receives the full reading list for the current time window plus the source registry.
      * It then builds one dataset per visible source and adds the optional primary calibrated
      * overlay.
+     *
+     * Alarm label contract for main graph:
+     *   - Pass "High Alarm" or "Low Alarm" if enabled.
+     *   - Pass "High Alarm\n(Disabled)" or "Low Alarm\n(Disabled)" if disabled.
+     *   - Pass "High Alarm\n(Enabled)" or "Low Alarm\n(Enabled)" if enabled and you want to show status.
+     *   - The caller is responsible for generating the correct label string with line breaks and capitalization.
      */
     fun renderDetail(
         chart: LineChart,
@@ -149,7 +155,9 @@ object ChartHelper {
         primarySourceId: String?,
         calibrationEnabled: Boolean,
         lowThresholdMgdl: Double,
-        highThresholdMgdl: Double
+        highThresholdMgdl: Double,
+        lowAlarmLabel: String,
+        highAlarmLabel: String
     ) {
         configureXAxisDetail(chart, dayStartMs, timeWindowHours, isToday)
         val series = MultiSourceChartSupport.buildMainGraphSeries(
@@ -171,15 +179,21 @@ object ChartHelper {
             outputUnit,
             calibrationEnabled,
             lowThresholdMgdl,
-            highThresholdMgdl
+            highThresholdMgdl,
+            lowAlarmLabel,
+            highAlarmLabel
         )
     }
 
     /**
-     * Renders the mini graph.
+     * Renders the mini graph (overview chart).
      *
      * Only the selected primary source is drawn. If the user has not selected a primary source yet
      * or the selected source has no rows in the current day, the chart is cleared.
+     *
+     * Alarm label contract for mini graph:
+     *   - Always pass the fixed strings "High Alarm" and "Low Alarm" for the two horizontal lines.
+     *   - Do NOT append status or line breaks for the mini graph.
      */
     fun renderOverview(
         chart: LineChart,
@@ -192,7 +206,9 @@ object ChartHelper {
         primarySourceId: String?,
         calibrationEnabled: Boolean,
         lowThresholdMgdl: Double,
-        highThresholdMgdl: Double
+        highThresholdMgdl: Double,
+        lowAlarmLabel: String,
+        highAlarmLabel: String
     ) {
         configureXAxisOverview(chart, dayStartMs)
         val primarySource = sources.firstOrNull { it.sourceId == primarySourceId }
@@ -216,7 +232,9 @@ object ChartHelper {
             outputUnit,
             calibrationEnabled,
             lowThresholdMgdl,
-            highThresholdMgdl
+            highThresholdMgdl,
+            lowAlarmLabel,
+            highAlarmLabel
         )
     }
 
@@ -310,7 +328,9 @@ object ChartHelper {
         axis: YAxis,
         outputUnit: String,
         lowThresholdMgdl: Double,
-        highThresholdMgdl: Double
+        highThresholdMgdl: Double,
+        lowAlarmLabel: String,
+        highAlarmLabel: String
     ) {
         val isMmol = outputUnit == "mmol"
         val lowLineValue =
@@ -319,13 +339,14 @@ object ChartHelper {
             if (isMmol) (highThresholdMgdl / MMOL_FACTOR).toFloat() else highThresholdMgdl.toFloat()
 
         axis.removeAllLimitLines()
-        axis.addLimitLine(LimitLine(lowLineValue, "Low Alarm").apply {
+
+        axis.addLimitLine(LimitLine(lowLineValue, lowAlarmLabel).apply {
             lineColor = 0xFFFF5252.toInt()
             lineWidth = LIMIT_LINE_WIDTH
             textColor = 0xFFFF5252.toInt()
             textSize = LIMIT_LINE_TEXT_SIZE
         })
-        axis.addLimitLine(LimitLine(highLineValue, "High Alarm").apply {
+        axis.addLimitLine(LimitLine(highLineValue, highAlarmLabel).apply {
             lineColor = 0xFFFFC107.toInt()
             lineWidth = LIMIT_LINE_WIDTH
             textColor = 0xFFFFC107.toInt()
@@ -342,7 +363,9 @@ object ChartHelper {
         outputUnit: String,
         showCalibrationOverlay: Boolean,
         lowThresholdMgdl: Double,
-        highThresholdMgdl: Double
+        highThresholdMgdl: Double,
+        lowAlarmLabel: String,
+        highAlarmLabel: String
     ) {
         val isMmol = outputUnit == "mmol"
         val allValuesMgdl = buildList {
@@ -363,7 +386,7 @@ object ChartHelper {
         val axisMax = if (isMmol) (maxMgdl / MMOL_FACTOR).toFloat() else maxMgdl.toFloat()
         chart.axisRight.axisMinimum = axisMin
         chart.axisRight.axisMaximum = axisMax
-        applyThresholdLimitLines(chart.axisRight, outputUnit, lowThresholdMgdl, highThresholdMgdl)
+        applyThresholdLimitLines(chart.axisRight, outputUnit, lowThresholdMgdl, highThresholdMgdl, lowAlarmLabel, highAlarmLabel)
     }
 
     /**

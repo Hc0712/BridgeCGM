@@ -218,6 +218,7 @@ class MainActivity : AppCompatActivity() {
         renderDetailChart(latestReadingsCache)
         renderOverview()
         renderStats(if (latestReadingsCache.isEmpty()) null else calculateStats(latestReadingsCache))
+        updateInputStatusBlocks()
     }
 
     /**
@@ -428,5 +429,47 @@ class MainActivity : AppCompatActivity() {
         binding.bottomNav.btnNavStatistics.setTextColor(nor)
         binding.bottomNav.btnNavCarbInsulin.setTextColor(nor)
         binding.bottomNav.btnNavTools.setTextColor(nor)
+    }
+
+    /**
+     * Updates the input status blocks below the main chart to show the current primary and optional input sources.
+     * The format matches the main graph legend: "Vendor / transport / Raw" or "Vendor / transport / Calibrated".
+     */
+    private fun updateInputStatusBlocks() {
+        // Find the primary source
+        val primarySource = sourcesCache.firstOrNull { it.sourceId == primarySourceId }
+        val calibrationEnabled = prefs.calibrationEnabled
+
+        // Build label for primary input
+        val primaryLabel = if (primarySource != null) {
+            if (calibrationEnabled) {
+                "${primarySource.vendorName} / ${primarySource.transportType.lowercase()} / Calibrated"
+            } else {
+                "${primarySource.vendorName} / ${primarySource.transportType.lowercase()} / Raw"
+            }
+        } else {
+            getString(R.string.no_primary_input)
+        }
+        binding.uiPrimaryInputStatus.text = primaryLabel
+
+        // Build labels for all other enabled and visible sources (excluding primary)
+        val optionalSources = sourcesCache
+            .filter { it.enabled && it.visibleOnMainGraph && it.sourceId != primarySourceId }
+
+        if (optionalSources.isNotEmpty()) {
+            val optionalLines = mutableListOf<String>()
+            optionalSources.forEachIndexed { idx, src ->
+                val prefix = "<b>Optional Input${idx + 1} : </b>"
+                val label = "${src.vendorName} / ${src.transportType.lowercase()} / Raw"
+                // If label contains newlines, add prefix to each line
+                label.split("\n").forEach { line ->
+                    optionalLines.add("$prefix${line.trim()}")
+                }
+            }
+            val html = optionalLines.joinToString("<br>")
+            binding.uiOptionalInputStatus.text = android.text.Html.fromHtml(html, android.text.Html.FROM_HTML_MODE_LEGACY)
+        } else {
+            binding.uiOptionalInputStatus.text = getString(R.string.no_optional_inputs)
+        }
     }
 }

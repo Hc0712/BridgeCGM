@@ -81,12 +81,28 @@ object CalibrationDialogHelper {
             )
         }
 
+        // Get the primary input source setting
+        val multiSourceSettings = tw.yourcompany.cgmbridge.core.prefs.MultiSourceSettings(activity)
+        val primaryInputSet = !multiSourceSettings.primaryInputSourceId.isNullOrBlank()
+
         val enableSwitch = SwitchCompat(activity).apply {
             text = activity.getString(R.string.calibration_enable_disable)
             isChecked = pendingEnabled
             textSize = 16f
+            isEnabled = primaryInputSet // Only enable if primary input is set
         }
         rootLayout.addView(enableSwitch)
+
+        // Add notice about input setting requirement below the switch, left-aligned
+        val inputSettingNotice = TextView(activity).apply {
+            text = activity.getString(R.string.calibration_notice_input_setting)
+            setPadding(0, 0, 0, blockMargin)
+            textSize = 12f
+            setTextColor(0xFFFF5252.toInt()) // Red for emphasis
+            setTypeface(typeface, Typeface.BOLD)
+            gravity = Gravity.START // Left align
+        }
+        rootLayout.addView(inputSettingNotice)
 
         val algorithmTitle = TextView(activity).apply {
             text = activity.getString(R.string.calibration_select_algorithm)

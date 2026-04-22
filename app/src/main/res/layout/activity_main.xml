@@ -225,7 +225,7 @@
 
     <!-- ════════ Current Setting Block (two-row string) ════════ -->
     <LinearLayout
-        android:id="@+id/currentSettingBlock"
+        android:id="@+id/uiInputStatusBlock"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
@@ -233,7 +233,7 @@
         android:gravity="center"
         android:background="#232323">
         <TextView
-            android:id="@+id/currentSettingLine1"
+            android:id="@+id/uiPrimaryInputStatus"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Current Setting Line 1"
@@ -241,14 +241,21 @@
             android:textSize="15sp"
             android:textStyle="bold"
             android:gravity="center" />
-        <TextView
-            android:id="@+id/currentSettingLine2"
+        <ScrollView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Current Setting Line 2"
-            android:textColor="#CCCCCC"
-            android:textSize="13sp"
-            android:gravity="center" />
+            android:maxHeight="120dp"
+            android:fillViewport="true"
+            android:scrollbars="vertical">
+            <TextView
+                android:id="@+id/uiOptionalInputStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Current Setting Line 2"
+                android:textColor="#CCCCCC"
+                android:textSize="13sp"
+                android:gravity="center" />
+        </ScrollView>
     </LinearLayout>
 
     <!-- ════════ Stats Section (Glucose Variability) ════════ -->

@@ -2,7 +2,7 @@
 
 BridgeCGM 通知讀取 → xDrip+ 640G/EverSense 廣播橋接 App。
 
-支援 AiDEX、OTTAi、Dexcom (Not yet verified) 三款 CGM。
+支援 AiDEX、OTTAI、Dexcom (Not yet verified) 三款 CGM。
 
 ---
 
@@ -10,9 +10,11 @@ BridgeCGM 通知讀取 → xDrip+ 640G/EverSense 廣播橋接 App。
 
 | 功能 | 說明 |
 |------|------|
-| 通知擷取 | 讀取 CGM Companion App 的 Notification，解析血糖值、趨勢、時間戳 |
-| 廣播轉發 | 以 xDrip+ 640G/EverSense 格式發送 `Intent` broadcast，供 xDrip+ 接收 |
-| 本地儲存 | Room DB 存歷史讀數，支援未來圖表與分享功能 |
+| 通知擷取      | 讀取 CGM Companion App 發出的 Notification，解析血糖值、趨勢、時間戳 |
+| 廣播轉發      | 以 xDrip+ 640G/EverSense 格式發送 `Intent` broadcast，供 xDrip+ 接收 |
+| 本地儲存      | Room DB 存歷史讀數，支援未來圖表與分享功能 |
+| 校正數值      | 水平、 線性映射 (尚未完成) |
+| 同時多顆CGM   | 支援接收兩顆以上CGM數值   | 
 
 ### 完整資料流
 
@@ -49,7 +51,7 @@ BridgeCGM 通知讀取 → xDrip+ 640G/EverSense 廣播橋接 App。
 > - 不需要改 `build.gradle.kts`
 > - 改完後重新 Build 即生效
 
-### `gradle.properties` 在哪裡？
+### Logcat 自行除錯  `gradle.properties` 在哪裡？
 
 ```
 bridge/                        ← 專案根目錄
@@ -90,7 +92,7 @@ cgmbridge.sharingEnabled.debug=false
 cgmbridge.sharingEnabled.release=false
 ```
 
-### 開關總覽
+###  Logcat debug message 開關總覽
 
 | Flag | gradle.properties key | Debug | Release | 用途 |
 |------|-----------------------|-------|---------|------|

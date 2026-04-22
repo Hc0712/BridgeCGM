@@ -43,6 +43,18 @@
                 android:layout_height="40dp" />
         </LinearLayout>
 
+        <!-- Alarm input setting warning -->
+        <TextView
+            android:id="@+id/tvAlarmInputSettingNotice"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/alarm_notice_input_setting"
+            android:textColor="#D32F2F"
+            android:textSize="14sp"
+            android:paddingTop="8dp"
+            android:paddingBottom="4dp"
+            android:gravity="start" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

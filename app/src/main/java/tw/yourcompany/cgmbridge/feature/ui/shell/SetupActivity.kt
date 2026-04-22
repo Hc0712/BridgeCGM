@@ -3,19 +3,34 @@ package tw.yourcompany.cgmbridge.feature.ui.shell
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
+import android.util.TypedValue
+import android.view.ViewGroup
+import android.widget.Button
+import android.widget.LinearLayout
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import tw.yourcompany.cgmbridge.databinding.ActivitySetupBinding
-import tw.yourcompany.cgmbridge.feature.keepalive.NotificationPollScheduler
-import tw.yourcompany.cgmbridge.feature.keepalive.GuardianServiceLauncher
-import tw.yourcompany.cgmbridge.core.prefs.AppPrefs
-import tw.yourcompany.cgmbridge.core.platform.BatteryOptimizationHelper
+import tw.yourcompany.cgmbridge.R
 import tw.yourcompany.cgmbridge.core.logging.DebugCategory
 import tw.yourcompany.cgmbridge.core.logging.DebugTrace
+import tw.yourcompany.cgmbridge.core.platform.BatteryOptimizationHelper
 import tw.yourcompany.cgmbridge.core.platform.NotificationAccessChecker
+import tw.yourcompany.cgmbridge.core.prefs.AppPrefs
+import tw.yourcompany.cgmbridge.databinding.ActivitySetupBinding
+import tw.yourcompany.cgmbridge.feature.alarm.AlarmNotificationPermissionHelper
+import tw.yourcompany.cgmbridge.feature.keepalive.GuardianServiceLauncher
+import tw.yourcompany.cgmbridge.feature.keepalive.NotificationPollScheduler
 
 /**
  * First-launch setup and warning screen.
+ *
+ * This patch keeps all permission entry points in one place so the user can complete setup from a
+ * single menu:
+ * - Notification listener access
+ * - Battery optimization exclusion
+ * - Alarm notification enablement
+ *
+ * The new “Enable notification” button is added programmatically so this patch can be applied
+ * without requiring a companion XML layout change.
  */
 class SetupActivity : AppCompatActivity() {
 
@@ -54,15 +69,18 @@ class SetupActivity : AppCompatActivity() {
             startActivity(BatteryOptimizationHelper.buildIgnoreOptimizationsIntent(this))
         }
 
+        addEnableNotificationButtonIfNeeded()
+
         binding.btnOk.setOnClickListener {
-            // ── Battery optimization enforcement (modeled after xDrip+ Home.checkBatteryOptimization()) ──
+            // Keep the original battery-optimization warning because the watchdog and listener
+            // stability depend on it for long-running use.
             if (!BatteryOptimizationHelper.isIgnoringOptimizations(this)) {
                 AlertDialog.Builder(this)
                     .setTitle("Battery Optimization Required")
                     .setMessage(
                         "This app must be excluded from battery optimization to reliably receive CGM data. " +
-                        "Without this, Android may stop delivering notifications after a few minutes.\n\n" +
-                        "Please tap 'Allow' on the next screen."
+                            "Without this, Android may stop delivering notifications after a few minutes." +
+                            "Please tap 'Allow' on the next screen."
                     )
                     .setPositiveButton("Open Settings") { _, _ ->
                         startActivity(BatteryOptimizationHelper.buildIgnoreOptimizationsIntent(this))
@@ -80,42 +98,96 @@ class SetupActivity : AppCompatActivity() {
     }
 
     /**
-     * Refresh button states when returning from system settings screens.
+     * Inserts the new “Enable notification” button beside the existing permission buttons.
+     *
+     * Why this is done in code instead of XML:
+     * - the uploaded task asked for a source-only patch zip;
+     * - the existing setup layout content was not part of the editable context here;
+     * - cloning the existing button style from code keeps the UI close to the current screen.
+     *
+     * The method is defensive:
+     * - if the parent container cannot be resolved as a [ViewGroup], the app simply skips the
+     *   extra button instead of crashing;
+     * - the new button copies layout params from the battery button so spacing remains consistent.
      */
+    private fun addEnableNotificationButtonIfNeeded() {
+        val parent = binding.btnBatteryOptimization.parent as? ViewGroup ?: return
+
+        val enableNotificationButton = Button(this).apply {
+            text = getString(R.string.open_alarm_notification_enable)
+            isAllCaps = binding.btnBatteryOptimization.isAllCaps
+            // Copy the original button text size directly in PX to avoid the deprecated
+            // DisplayMetrics.scaledDensity field while preserving the same rendered size.
+            setTextSize(TypedValue.COMPLEX_UNIT_PX, binding.btnBatteryOptimization.textSize)
+            setOnClickListener {
+                AlarmNotificationPermissionHelper.showEnableNotificationDialog(this@SetupActivity)
+            }
+        }
+
+        binding.btnBatteryOptimization.background?.constantState?.newDrawable()?.mutate()?.let {
+            enableNotificationButton.background = it
+        }
+        enableNotificationButton.setTextColor(binding.btnBatteryOptimization.currentTextColor)
+
+        enableNotificationButton.layoutParams = cloneLayoutParams(binding.btnBatteryOptimization.layoutParams)
+
+        val insertIndex = parent.indexOfChild(binding.btnBatteryOptimization) + 1
+        if (insertIndex in 1..parent.childCount) {
+            parent.addView(enableNotificationButton, insertIndex)
+        } else {
+            parent.addView(enableNotificationButton)
+        }
+    }
+
+    /**
+     * Creates a safe copy of the original button layout params.
+     *
+     * Android view parents require the correct concrete LayoutParams subclass. Reusing the original
+     * instance directly can fail because one view cannot own the same LayoutParams object as
+     * another view. This helper preserves margins and width/height semantics while avoiding that
+     * reuse bug.
+     */
+    private fun cloneLayoutParams(source: ViewGroup.LayoutParams): ViewGroup.LayoutParams {
+        return when (source) {
+            is LinearLayout.LayoutParams -> LinearLayout.LayoutParams(source)
+            is ViewGroup.MarginLayoutParams -> ViewGroup.MarginLayoutParams(source)
+            else -> ViewGroup.LayoutParams(source)
+        }
+    }
+
+    /** Refresh button-related diagnostics after the user returns from system settings screens. */
     override fun onResume() {
         super.onResume()
         if (::binding.isInitialized) {
             val isIgnoring = BatteryOptimizationHelper.isIgnoringOptimizations(this)
             val hasAccess = NotificationAccessChecker.isNotificationAccessGranted(this)
-            DebugTrace.t(DebugCategory.SETTING, "SETUP-RESUME", "battery_opt_ignored=$isIgnoring notif_access=$hasAccess")
+            DebugTrace.t(
+                DebugCategory.SETTING,
+                "SETUP-RESUME",
+                "battery_opt_ignored=$isIgnoring notif_access=$hasAccess"
+            )
         }
     }
 
     /**
      * Saves preferences, starts keep-alive services, and opens the main screen.
      *
-     * This is a keep-alive startup entry point — it arms the AlarmManager heartbeat
-     * (Layer 3) immediately after first-time setup. This ensures the watchdog is
-     * active even before the user has received their first CGM notification.
-     *
-     * ### Execution order:
-     * 1. Save unit/role preferences
-     * 2. Mark setup as accepted (skip this screen on future launches)
-     * 3. Start guardian foreground service (Layer 8)
-     * 4. Arm heartbeat alarm (Layer 3)
-     * 5. Navigate to MainActivity
+     * This is a keep-alive startup entry point — it arms the AlarmManager heartbeat immediately
+     * after first-time setup so the watchdog is active before the first CGM notification arrives.
      */
     private fun completeSetup() {
         prefs.outputUnit = if (binding.radioMmol.isChecked) "mmol" else "mgdl"
         prefs.role = if (binding.radioReceiver.isChecked) "receiver" else "host"
         prefs.setupAccepted = true
+
         DebugTrace.t(
             DebugCategory.SETTING,
             "SETUP-OK",
             "notif_access=${NotificationAccessChecker.isNotificationAccessGranted(this)} " +
-            "ignore_batt=${BatteryOptimizationHelper.isIgnoringOptimizations(this)} " +
-            "unit=${prefs.outputUnit} role=${prefs.role}"
+                "ignore_batt=${BatteryOptimizationHelper.isIgnoringOptimizations(this)} " +
+                "unit=${prefs.outputUnit}"
         )
+
         GuardianServiceLauncher.start(this, "setup-ok")
         NotificationPollScheduler.schedule(this)
         startMainAndFinish()

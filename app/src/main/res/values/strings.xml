@@ -103,4 +103,13 @@
     <string name="no_primary_input">No primary input Please Set.->INPUT SETTING</string>
     <string name="no_optional_inputs">No optional inputs</string>
     <string name="alarm_notice_input_setting">需至 Set.->INPUT SETTING 設定後才能警報</string>
+    
+    <!-- Patch-only string resources for the alarm-notification permission and action update.   -->
+    <string name="open_alarm_notification_enable">Enable notification</string>
+    <string name="alarm_notification_permission_title">Enable alarm notifications</string>
+    <string name="alarm_notification_permission_message">BridgeCGM needs notification access so glucose alerts can show the Snooze button. Android is currently blocking notifications for this app.</string>
+    <string name="alarm_notification_permission_open_settings">Open settings</string>
+    <string name="alarm_notification_action_snooze">Snooze</string>
+    <string name="alarm_notification_action_setting">Setting</string>
+    
 </resources>

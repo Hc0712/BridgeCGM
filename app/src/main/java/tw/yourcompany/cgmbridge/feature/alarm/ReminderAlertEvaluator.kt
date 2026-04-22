@@ -75,6 +75,7 @@ object ReminderAlertEvaluator {
                 "ALARM-SUPPRESS",
                 "${winner.kind} active but not due yet remainingMs=$remainingMs latest=$latestMgdl"
             )
+            AlarmNotificationController.showOrUpdateAlarmNotification(context, winner, latestMgdl)
             AlarmReplayScheduler.schedule(context, winner.kind, winner.nextTriggerAtMs)
             return
         }
@@ -89,6 +90,7 @@ object ReminderAlertEvaluator {
             "ALARM-TRIGGER",
             "${winner.kind} trigger latest=$latestMgdl threshold=${winner.thresholdMgdl} durationSec=${winner.durationSec} nextAt=$nextAt"
         )
+        AlarmNotificationController.showOrUpdateAlarmNotification(context, winner, latestMgdl)
         AlarmSoundPlayer.playByName(context, winner.soundName, winner.durationSec)
         AlarmReplayScheduler.schedule(context, winner.kind, nextAt)
     }
@@ -97,6 +99,7 @@ object ReminderAlertEvaluator {
     fun clearAll(context: Context, prefs: AppPrefs = AppPrefs(context)) {
         AlarmConfig.all(prefs).forEach { clearOne(context, prefs, it) }
         AlarmSoundPlayer.stop()
+        AlarmNotificationController.cancelAll(context)
     }
 
     /**
@@ -110,5 +113,6 @@ object ReminderAlertEvaluator {
         }
         AlarmReplayScheduler.cancel(context, rule.kind)
         AlarmConfig.clearRuntimeState(prefs, rule)
+        AlarmNotificationController.cancel(context, rule.kind)
     }
 }

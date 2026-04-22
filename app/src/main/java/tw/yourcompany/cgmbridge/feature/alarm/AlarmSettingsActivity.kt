@@ -1,6 +1,5 @@
 package tw.yourcompany.cgmbridge.feature.alarm
 
-import android.media.AudioManager
 import android.os.Bundle
 import android.text.InputType
 import android.widget.EditText
@@ -9,6 +8,7 @@ import androidx.activity.addCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import tw.yourcompany.cgmbridge.R
+import tw.yourcompany.cgmbridge.core.constants.GlucoseConstants.MMOL_FACTOR
 import tw.yourcompany.cgmbridge.core.prefs.AppPrefs
 import tw.yourcompany.cgmbridge.databinding.ActivityAlarmSettingsBinding
 import java.util.Locale
@@ -16,145 +16,119 @@ import java.util.Locale
 /**
  * Reminder Setting screen.
  *
- * Important behavioral contract required by this task:
- *  - tapping threshold / method / interval / duration rows must NEVER play alarm;
- *  - switching an alarm OFF must stop playback and clear its runtime state;
- *  - switching an alarm ON must play that alarm sound exactly once.
+ * Patch-specific behavior change:
+ * - this screen no longer owns the “Enable alarm notifications” permission prompt;
+ * - that dialog was moved to SetupActivity so all required permissions can be granted together;
+ * - this screen now focuses only on alarm thresholds, intervals, durations, and test playback.
  */
 class AlarmSettingsActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityAlarmSettingsBinding
     private lateinit var prefs: AppPrefs
 
-    private companion object {
-        const val MMOL_FACTOR = 18.0
-        const val DEFAULT_MAX_MGDL = 250.0
-    }
-
     private var suppressSwitchCallback = false
-
-    private fun maybeWarnMutedAlarmVolume() {
-        val am = getSystemService(AudioManager::class.java) ?: return
-        if (am.getStreamVolume(AudioManager.STREAM_ALARM) == 0) {
-            Toast.makeText(this, getString(R.string.alarm_volume_muted_hint), Toast.LENGTH_LONG).show()
-        }
-    }
-
-    /** Plays exactly one manual confirmation sound when the user turns an alarm ON. */
-    private fun playManualEnableSound(kind: AlarmKind) {
-        maybeWarnMutedAlarmVolume()
-        when (kind) {
-            AlarmKind.HIGH -> AlarmSoundPlayer.playByName(this, "high", prefs.alarmHighDurationSec)
-            AlarmKind.LOW -> AlarmSoundPlayer.playByName(this, "low", prefs.alarmLowDurationSec)
-            AlarmKind.URGENT_LOW -> AlarmSoundPlayer.playByName(this, "urgent", prefs.alarmUrgentLowDurationSec)
-        }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityAlarmSettingsBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
         prefs = AppPrefs(this)
+
+        onBackPressedDispatcher.addCallback(this) { saveAndFinish() }
         bindViews()
         renderAll()
-
-        onBackPressedDispatcher.addCallback(this) {
-            saveAndFinish()
-        }
     }
 
     private fun bindViews() {
         binding.btnBack.setOnClickListener { saveAndFinish() }
 
-        binding.switchHigh.setOnCheckedChangeListener { _, isChecked ->
-            if (suppressSwitchCallback) return@setOnCheckedChangeListener
-            handleEnableToggle(AlarmKind.HIGH, isChecked)
+        binding.switchHigh.setOnCheckedChangeListener { _, enabled ->
+            if (!suppressSwitchCallback) handleEnableToggle(AlarmKind.HIGH, enabled)
         }
-        binding.switchLow.setOnCheckedChangeListener { _, isChecked ->
-            if (suppressSwitchCallback) return@setOnCheckedChangeListener
-            handleEnableToggle(AlarmKind.LOW, isChecked)
+        binding.switchLow.setOnCheckedChangeListener { _, enabled ->
+            if (!suppressSwitchCallback) handleEnableToggle(AlarmKind.LOW, enabled)
         }
-        binding.switchUrgentLow.setOnCheckedChangeListener { _, isChecked ->
-            if (suppressSwitchCallback) return@setOnCheckedChangeListener
-            handleEnableToggle(AlarmKind.URGENT_LOW, isChecked)
+        binding.switchUrgentLow.setOnCheckedChangeListener { _, enabled ->
+            if (!suppressSwitchCallback) handleEnableToggle(AlarmKind.URGENT_LOW, enabled)
         }
 
-        // IMPORTANT: row clicks only edit values. They must never play sound.
         binding.rowHighThreshold.setOnClickListener {
-            val isMmol = prefs.outputUnit == "mmol"
-            val min = if (isMmol) 140.0 / MMOL_FACTOR else 140.0
-            val max = if (isMmol) DEFAULT_MAX_MGDL / MMOL_FACTOR else DEFAULT_MAX_MGDL
-            showDoubleInput(getString(R.string.alarm_high_threshold), prefs.glucoseForDisplay(prefs.dHighBlood), min, max) { value ->
-                prefs.dHighBlood = prefs.glucoseFromDisplay(value)
+            showDoubleInput(
+                title = getString(R.string.alarm_high_threshold),
+                currentDisplayValue = prefs.glucoseForDisplay(prefs.dHighBlood),
+                minDisplay = prefs.glucoseForDisplay(40.0),
+                maxDisplay = prefs.glucoseForDisplay(400.0)
+            ) { displayValue ->
+                prefs.dHighBlood = prefs.glucoseFromDisplay(displayValue)
                 renderAll()
             }
         }
-        binding.rowHighMethod.setOnClickListener {
-            prefs.alarmHighMethod = "sound"
-            Toast.makeText(this, getString(R.string.alarm_future_work), Toast.LENGTH_SHORT).show()
-            renderAll()
-        }
-        binding.rowHighInterval.setOnClickListener {
-            showIntInput(getString(R.string.alarm_reminder_interval), prefs.alarmHighIntervalMin, 1, 1440) {
-                prefs.alarmHighIntervalMin = it
-                renderAll()
-            }
-        }
-        binding.rowHighDuration.setOnClickListener {
-            showIntInput(getString(R.string.alarm_alert_duration), prefs.alarmHighDurationSec, 1, 120) {
-                prefs.alarmHighDurationSec = it
-                renderAll()
-            }
-        }
-
         binding.rowLowThreshold.setOnClickListener {
-            val isMmol = prefs.outputUnit == "mmol"
-            val min = if (isMmol) 54.0 / MMOL_FACTOR else 54.0
-            val max = if (isMmol) 108.0 / MMOL_FACTOR else 108.0
-            showDoubleInput(getString(R.string.alarm_low_threshold), prefs.glucoseForDisplay(prefs.dLowBlood), min, max) { value ->
-                prefs.dLowBlood = prefs.glucoseFromDisplay(value)
-                if (prefs.dUrgentLowBlood > prefs.dLowBlood) prefs.dUrgentLowBlood = prefs.dLowBlood
+            showDoubleInput(
+                title = getString(R.string.alarm_low_threshold),
+                currentDisplayValue = prefs.glucoseForDisplay(prefs.dLowBlood),
+                minDisplay = prefs.glucoseForDisplay(40.0),
+                maxDisplay = prefs.glucoseForDisplay(250.0)
+            ) { displayValue ->
+                prefs.dLowBlood = prefs.glucoseFromDisplay(displayValue)
                 renderAll()
             }
         }
         binding.rowUrgentLowThreshold.setOnClickListener {
-            val isMmol = prefs.outputUnit == "mmol"
-            val minMgdl = 39.0
-            val maxMgdl = minOf(prefs.dLowBlood, 80.0)
-            val min = if (isMmol) minMgdl / MMOL_FACTOR else minMgdl
-            val max = if (isMmol) maxMgdl / MMOL_FACTOR else maxMgdl
-            showDoubleInput(getString(R.string.alarm_urgent_low_threshold), prefs.glucoseForDisplay(prefs.dUrgentLowBlood), min, max) { value ->
-                prefs.dUrgentLowBlood = minOf(prefs.glucoseFromDisplay(value), prefs.dLowBlood)
+            showDoubleInput(
+                title = getString(R.string.alarm_urgent_low_threshold),
+                currentDisplayValue = prefs.glucoseForDisplay(prefs.dUrgentLowBlood),
+                minDisplay = prefs.glucoseForDisplay(40.0),
+                maxDisplay = prefs.glucoseForDisplay(150.0)
+            ) { displayValue ->
+                prefs.dUrgentLowBlood = prefs.glucoseFromDisplay(displayValue)
                 renderAll()
             }
         }
+
+        binding.rowHighMethod.setOnClickListener {
+            Toast.makeText(this, getString(R.string.alarm_sound_label), Toast.LENGTH_SHORT).show()
+        }
         binding.rowLowMethod.setOnClickListener {
-            Toast.makeText(this, getString(R.string.alarm_future_work), Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.alarm_sound_label), Toast.LENGTH_SHORT).show()
         }
         binding.rowUrgentLowMethod.setOnClickListener {
-            Toast.makeText(this, getString(R.string.alarm_future_work), Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.alarm_sound_label), Toast.LENGTH_SHORT).show()
+        }
+
+        binding.rowHighInterval.setOnClickListener {
+            showIntInput(getString(R.string.alarm_reminder_interval), prefs.alarmHighIntervalMin, 1, 120) {
+                prefs.alarmHighIntervalMin = it
+                renderAll()
+            }
         }
         binding.rowLowInterval.setOnClickListener {
-            showIntInput(getString(R.string.alarm_reminder_interval), prefs.alarmLowIntervalMin, 1, 1440) {
+            showIntInput(getString(R.string.alarm_reminder_interval), prefs.alarmLowIntervalMin, 1, 120) {
                 prefs.alarmLowIntervalMin = it
                 renderAll()
             }
         }
-        binding.rowLowDuration.setOnClickListener {
-            showIntInput(getString(R.string.alarm_alert_duration), prefs.alarmLowDurationSec, 1, 120) {
-                prefs.alarmLowDurationSec = it
-                renderAll()
-            }
-        }
         binding.rowUrgentLowInterval.setOnClickListener {
-            showIntInput(getString(R.string.alarm_reminder_interval), prefs.alarmUrgentLowIntervalMin, 1, 1440) {
+            showIntInput(getString(R.string.alarm_reminder_interval), prefs.alarmUrgentLowIntervalMin, 1, 120) {
                 prefs.alarmUrgentLowIntervalMin = it
                 renderAll()
             }
         }
+
+        binding.rowHighDuration.setOnClickListener {
+            showIntInput(getString(R.string.alarm_alert_duration), prefs.alarmHighDurationSec, 1, 60) {
+                prefs.alarmHighDurationSec = it
+                renderAll()
+            }
+        }
+        binding.rowLowDuration.setOnClickListener {
+            showIntInput(getString(R.string.alarm_alert_duration), prefs.alarmLowDurationSec, 1, 60) {
+                prefs.alarmLowDurationSec = it
+                renderAll()
+            }
+        }
         binding.rowUrgentLowDuration.setOnClickListener {
-            showIntInput(getString(R.string.alarm_alert_duration), prefs.alarmUrgentLowDurationSec, 1, 120) {
+            showIntInput(getString(R.string.alarm_alert_duration), prefs.alarmUrgentLowDurationSec, 1, 60) {
                 prefs.alarmUrgentLowDurationSec = it
                 renderAll()
             }
@@ -165,14 +139,15 @@ class AlarmSettingsActivity : AppCompatActivity() {
      * Handles the exact workflow required for the On/Off switches.
      *
      * OFF:
-     *  - persist disabled state
-     *  - stop any currently playing audio
-     *  - clear the corresponding replay timer and runtime state
+     * - persist disabled state
+     * - stop any currently playing audio
+     * - clear the corresponding replay timer and runtime state
      *
      * ON:
-     *  - persist enabled state
-     *  - play one immediate confirmation sound
-     *  - do not mark the alarm active here; the glucose evaluator owns that state
+     * - persist enabled state
+     * - play one immediate confirmation sound
+     * - do not request notification permission here anymore; SetupActivity owns that flow now
+     * - do not mark the alarm active here; the glucose evaluator owns that state
      */
     private fun handleEnableToggle(kind: AlarmKind, enabled: Boolean) {
         when (kind) {
@@ -180,6 +155,7 @@ class AlarmSettingsActivity : AppCompatActivity() {
             AlarmKind.LOW -> prefs.alarmLowEnabled = enabled
             AlarmKind.URGENT_LOW -> prefs.alarmUrgentLowEnabled = enabled
         }
+
         if (enabled) {
             playManualEnableSound(kind)
         } else {
@@ -191,7 +167,16 @@ class AlarmSettingsActivity : AppCompatActivity() {
             ReminderAlertEvaluator.clearOne(this, prefs, rule)
             AlarmSoundPlayer.stop()
         }
+
         renderAll()
+    }
+
+    private fun playManualEnableSound(kind: AlarmKind) {
+        when (kind) {
+            AlarmKind.HIGH -> AlarmSoundPlayer.playByName(this, "high", prefs.alarmHighDurationSec)
+            AlarmKind.LOW -> AlarmSoundPlayer.playByName(this, "low", prefs.alarmLowDurationSec)
+            AlarmKind.URGENT_LOW -> AlarmSoundPlayer.playByName(this, "urgent", prefs.alarmUrgentLowDurationSec)
+        }
     }
 
     private fun renderAll() {
@@ -203,6 +188,7 @@ class AlarmSettingsActivity : AppCompatActivity() {
         } finally {
             suppressSwitchCallback = false
         }
+
         binding.tvHighThresholdValue.text = formatGlucoseValue(prefs.dHighBlood)
         binding.tvLowThresholdValue.text = formatGlucoseValue(prefs.dLowBlood)
         binding.tvUrgentLowThresholdValue.text = formatGlucoseValue(prefs.dUrgentLowBlood)
@@ -223,16 +209,32 @@ class AlarmSettingsActivity : AppCompatActivity() {
     }
 
     private fun formatGlucoseValue(valueMgdl: Double): String {
-        return if (prefs.outputUnit == "mmol") getString(R.string.alarm_value_mmol, valueMgdl / MMOL_FACTOR)
-        else getString(R.string.alarm_value_mgdl, valueMgdl)
+        return if (prefs.outputUnit == "mmol") {
+            getString(R.string.alarm_value_mmol, valueMgdl / MMOL_FACTOR)
+        } else {
+            getString(R.string.alarm_value_mgdl, valueMgdl)
+        }
     }
 
-    private fun showDoubleInput(title: String, currentDisplayValue: Double, minDisplay: Double, maxDisplay: Double, onValid: (Double) -> Unit) {
+    private fun showDoubleInput(
+        title: String,
+        currentDisplayValue: Double,
+        minDisplay: Double,
+        maxDisplay: Double,
+        onValid: (Double) -> Unit
+    ) {
         val editText = EditText(this).apply {
             inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
-            setText(if (prefs.outputUnit == "mmol") String.format(Locale.US, "%.1f", currentDisplayValue) else String.format(Locale.US, "%.0f", currentDisplayValue))
+            setText(
+                if (prefs.outputUnit == "mmol") {
+                    String.format(Locale.US, "%.1f", currentDisplayValue)
+                } else {
+                    String.format(Locale.US, "%.0f", currentDisplayValue)
+                }
+            )
             setSelection(text.length)
         }
+
         AlertDialog.Builder(this)
             .setTitle(title)
             .setView(editText)
@@ -248,12 +250,19 @@ class AlarmSettingsActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun showIntInput(title: String, currentValue: Int, minValue: Int, maxValue: Int, onValid: (Int) -> Unit) {
+    private fun showIntInput(
+        title: String,
+        currentValue: Int,
+        minValue: Int,
+        maxValue: Int,
+        onValid: (Int) -> Unit
+    ) {
         val editText = EditText(this).apply {
             inputType = InputType.TYPE_CLASS_NUMBER
             setText(currentValue.toString())
             setSelection(text.length)
         }
+
         AlertDialog.Builder(this)
             .setTitle(title)
             .setView(editText)

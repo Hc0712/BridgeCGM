@@ -100,7 +100,7 @@ class BgReadingImporter(
         val direct = sample.vendorName.trim().lowercase()
         return when {
             direct in setOf("aidex", "ottai", "dexcom") -> direct
-            sample.sourcePackage.startsWith("com.") -> SupportedPackages.vendorForPackage(sample.sourcePackage)
+            sample.originKey?.startsWith("com.") == true -> SupportedPackages.vendorForPackage(sample.originKey.orEmpty())
             else -> direct.ifBlank { "unknown" }
         }
     }

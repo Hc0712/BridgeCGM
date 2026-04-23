@@ -86,7 +86,7 @@ class CgmNotificationListenerService : NotificationListenerService() {
     /** PowerManager for WakeLock acquisition during processing. */
     private lateinit var powerManager: PowerManager
 
-    /** Clean Version 1 multi-source settings (primaryOutputSourceId, stale flags). */
+    /** Clean Version 1 multi-source settings (primaryInputSourceId, stale flags). */
     private lateinit var multiSourceSettings: MultiSourceSettings
 
     /** Notifier that reports primary-source disconnection without auto switching. */

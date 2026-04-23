@@ -45,7 +45,7 @@ object MultiSourceChartSupport {
     fun buildMainGraphSeries(
         rows: List<BgReadingEntity>,
         sources: List<CgmSourceEntity>,
-        primaryOutputSourceId: String?,
+        primaryInputSourceId: String?,
         calibrationEnabled: Boolean
     ): List<GraphSeries> {
         val sourceMap = sources.associateBy { it.sourceId }
@@ -62,7 +62,7 @@ object MultiSourceChartSupport {
                 useCalibratedValue = false,
                 rows = ordered
             )
-            if (calibrationEnabled && primaryOutputSourceId == sourceId) {
+            if (calibrationEnabled && primaryInputSourceId == sourceId) {
                 result += GraphSeries(
                     sourceId = sourceId,
                     label = "${source.vendorName} / ${source.transportType.lowercase()} / Calibrated",

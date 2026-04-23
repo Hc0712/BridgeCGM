@@ -163,7 +163,7 @@ object ChartHelper {
         val series = MultiSourceChartSupport.buildMainGraphSeries(
             rows = rows,
             sources = sources,
-            primaryOutputSourceId = primarySourceId,
+            primaryInputSourceId = primarySourceId,
             calibrationEnabled = calibrationEnabled
         )
         renderSeries(

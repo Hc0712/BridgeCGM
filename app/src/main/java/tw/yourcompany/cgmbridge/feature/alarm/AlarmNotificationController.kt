@@ -21,7 +21,9 @@ import tw.yourcompany.cgmbridge.core.logging.DebugTrace
  * Patch summary:
  * - the notification body now explains the quiet duration applied by Snooze;
  * - tapping the notification body no longer opens Reminder settings;
- * - a dedicated “Setting” action button now opens Reminder settings explicitly.
+ * - a dedicated “Setting” action button now opens Reminder settings explicitly;
+ * - the Setting action now uses a direct Activity PendingIntent so Android can bring the
+ *   existing Reminder settings task to the front without hitting notification-trampoline rules.
  *
  * Sound playback still belongs to [AlarmSoundPlayer]. The notification remains a visual control
  * surface only.
@@ -71,13 +73,16 @@ object AlarmNotificationController {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val settingIntent = PendingIntent.getBroadcast(
+        /**
+         * Android 12+ can block notification trampolines when a BroadcastReceiver tries to open
+         * an Activity indirectly from a notification tap. Launching Reminder settings through a
+         * direct Activity PendingIntent lets the system bring the task to the foreground in the
+         * supported way, which is both more stable and more compliant with current Android rules.
+         */
+        val settingIntent = PendingIntent.getActivity(
             context,
             requestCode(rule.kind, 250),
-            Intent(context, AlarmNotificationActionReceiver::class.java).apply {
-                action = AlarmNotificationActionReceiver.ACTION_OPEN_SETTINGS
-                putExtra(AlarmNotificationActionReceiver.EXTRA_KIND, rule.kind.name)
-            },
+            AlarmSettingsLaunchIntentFactory.create(context, rule.kind),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 

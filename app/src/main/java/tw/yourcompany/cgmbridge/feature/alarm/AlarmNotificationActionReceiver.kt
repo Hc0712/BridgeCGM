@@ -15,7 +15,9 @@ import tw.yourcompany.cgmbridge.core.prefs.AppPrefs
  * - Setting: open the Reminder setting screen without forcing a snooze.
  *
  * That behavior matches the task requirement to remove the old “snooze and open settings”
- * coupling so the notification can offer both actions independently.
+ * coupling so the notification can offer both actions independently. Android 12+ can block
+ * notification trampolines, so the main notification path now launches the Activity directly and
+ * this receiver keeps only a documented fallback implementation.
  */
 class AlarmNotificationActionReceiver : BroadcastReceiver() {
 
@@ -47,7 +49,7 @@ class AlarmNotificationActionReceiver : BroadcastReceiver() {
             }
 
             ACTION_OPEN_SETTINGS -> {
-                openReminderSettings(context)
+                openReminderSettings(context, kind)
                 DebugTrace.t(DebugCategory.ALARM, "ALARM-NOTIFICATION-SETTING", "opened reminder settings")
             }
         }
@@ -74,13 +76,16 @@ class AlarmNotificationActionReceiver : BroadcastReceiver() {
         AlarmReplayScheduler.schedule(context, kind, nextAt)
     }
 
-    /** Opens the Reminder setting screen from the notification action button. */
-    private fun openReminderSettings(context: Context) {
-        context.startActivity(
-            Intent(context, AlarmSettingsActivity::class.java).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            }
-        )
+    /**
+     * Opens the Reminder setting screen from the notification receiver fallback path.
+     *
+     * The primary fix launches Reminder settings directly from the notification via
+     * PendingIntent.getActivity(). This receiver path is kept only as a compatibility fallback for
+     * any older PendingIntent or internal caller that still routes through ACTION_OPEN_SETTINGS.
+     * Reusing the shared intent factory keeps both code paths aligned.
+     */
+    private fun openReminderSettings(context: Context, kind: AlarmKind?) {
+        context.startActivity(AlarmSettingsLaunchIntentFactory.create(context, kind))
     }
 
     companion object {

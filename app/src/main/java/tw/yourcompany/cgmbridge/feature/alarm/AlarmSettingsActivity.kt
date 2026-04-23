@@ -1,5 +1,6 @@
 package tw.yourcompany.cgmbridge.feature.alarm
 
+import android.content.Intent
 import android.os.Bundle
 import android.text.InputType
 import android.widget.EditText
@@ -19,7 +20,9 @@ import java.util.Locale
  * Patch-specific behavior change:
  * - this screen no longer owns the “Enable alarm notifications” permission prompt;
  * - that dialog was moved to SetupActivity so all required permissions can be granted together;
- * - this screen now focuses only on alarm thresholds, intervals, durations, and test playback.
+ * - this screen now focuses only on alarm thresholds, intervals, durations, and test playback;
+ * - repeated notification taps reuse the same activity instance so the dialog can be be brought
+ *   back to the foreground without creating duplicate floating windows.
  */
 class AlarmSettingsActivity : AppCompatActivity() {
 
@@ -33,10 +36,56 @@ class AlarmSettingsActivity : AppCompatActivity() {
         binding = ActivityAlarmSettingsBinding.inflate(layoutInflater)
         setContentView(binding.root)
         prefs = AppPrefs(this)
+        applyNotificationLaunchPresentationIfNeeded(intent)
 
         onBackPressedDispatcher.addCallback(this) { saveAndFinish() }
         bindViews()
         renderAll()
+    }
+
+    /**
+     * Called when Android routes a new notification tap into the existing singleTask instance.
+     *
+     * The activity is intentionally reused instead of recreated so the Reminder settings dialog can
+     * be brought to the foreground without stacking duplicate floating windows. Re-applying the
+     * lightweight presentation hints keeps the reused window feeling focused on OEM builds where a
+     * floating activity can briefly appear behind the current top window before focus settles.
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        applyNotificationLaunchPresentationIfNeeded(intent)
+    }
+
+    /**
+     * Re-applies a small amount of window presentation state when Reminder settings is opened from
+     * the alarm notification.
+     *
+     * Important constraints:
+     * - This method stays inside the normal Activity window APIs.
+     * - It does not request overlay permissions or alter the window type.
+     * - The goal is simply to help the existing dialog-themed Activity win focus and feel visibly
+     *   foregrounded after Android delivers a direct notification launch or onNewIntent() reuse.
+     */
+    private fun applyNotificationLaunchPresentationIfNeeded(intent: Intent?) {
+        if (intent?.getBooleanExtra(
+                AlarmSettingsLaunchIntentFactory.EXTRA_FROM_NOTIFICATION_ACTION,
+                false
+            ) != true
+        ) {
+            return
+        }
+
+        val activityWindow = window ?: return
+        val attrs = activityWindow.attributes
+        attrs.dimAmount = maxOf(attrs.dimAmount, 0.6f)
+        activityWindow.attributes = attrs
+
+        activityWindow.decorView.post {
+            if (!isFinishing && !isDestroyed) {
+                activityWindow.decorView.requestFocus()
+            }
+        }
     }
 
     private fun bindViews() {

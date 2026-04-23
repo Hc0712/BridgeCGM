@@ -88,13 +88,8 @@
 <string name="alarm_future_work">This item is reserved for future work.</string>
 <string name="alarm_current_value">Current value: %1$s</string>
 <string name="alarm_volume_muted_hint">Alarm volume is muted. Please increase the device alarm volume.</string>
-<string name="settings_alarm_tools_title">Alarm / Sound Tools</string>
-<string name="settings_alarm_tools_message">Notification access and alarm playback are separate. DND access state: %1$s</string>
 <string name="settings_state_granted">granted</string>
 <string name="settings_state_not_granted">not granted</string>
-<string name="settings_open_sound_settings">Open Sound Settings</string>
-<string name="settings_open_dnd_access">Open DND Access</string>
-<string name="settings_open_app_notification_settings">Open App Notification Settings</string>
     <string name="stat_hba1c_est_label">HbA1c est.</string>
     <string name="stat_range_label_placeholder">Range(in/high/low)</string>
     <string name="stat_range_label_dynamic">Range(in/high/low) between %1$s and %2$s :</string>
@@ -102,7 +97,6 @@
     <string name="stat_range_value">%1$.1f%% / %2$.1f%% / %3$.1f%%</string>
     <string name="no_primary_input">No primary input Please Set.->INPUT SETTING</string>
     <string name="no_optional_inputs">No optional inputs</string>
-    <string name="alarm_notice_input_setting">需至 Set.->INPUT SETTING 設定後才能警報</string>
     
     <!-- Patch-only string resources for the alarm-notification permission and action update.   -->
     <string name="open_alarm_notification_enable">Enable notification</string>

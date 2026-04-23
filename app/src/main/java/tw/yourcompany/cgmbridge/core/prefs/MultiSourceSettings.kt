@@ -9,14 +9,11 @@ import android.content.Context
  * Why this wrapper exists:
  * - it gives the UI, alarm engine, calibration pipeline, and graph layer one shared place to read
  *   the selected primary source;
- * - it preserves backward compatibility with the older `primaryOutputSourceId` key while moving
- *   new code toward the product-spec name `primaryInputSourceId`;
  * - it keeps the stale-primary flags next to the primary-source selection because those values
  *   belong to the same business concept.
  */
 class MultiSourceSettings(context: Context) {
     private val sp = context.getSharedPreferences("bridge_multi_source_prefs", Context.MODE_PRIVATE)
-
     /**
      * The exact source channel chosen by the user as the primary input source.
      *
@@ -26,28 +23,10 @@ class MultiSourceSettings(context: Context) {
      * - mini graph filtering,
      * - alarm evaluation,
      * - stale-primary monitoring.
-     *
-     * Backward compatibility rule:
-     * Older builds stored the same concept under `primaryOutputSourceId`.
-     * The getter falls back to the old key so existing installations keep working after the
-     * migration without requiring the user to select the source again.
      */
     var primaryInputSourceId: String?
-        get() = sp.getString("primaryInputSourceId", sp.getString("primaryOutputSourceId", null))
-        set(value) = sp.edit()
-            .putString("primaryInputSourceId", value)
-            .putString("primaryOutputSourceId", value)
-            .apply()
-
-    /**
-     * Compatibility alias kept for legacy callers that still use the older property name.
-     * New code should prefer [primaryInputSourceId].
-     */
-    var primaryOutputSourceId: String?
-        get() = primaryInputSourceId
-        set(value) {
-            primaryInputSourceId = value
-        }
+        get() = sp.getString("primaryInputSourceId", null)
+        set(value) = sp.edit().putString("primaryInputSourceId", value).apply()
 
     /**
      * Sticky notification state used to avoid spamming the user with repeated stale-source

@@ -12,11 +12,13 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import tw.yourcompany.cgmbridge.R
 import tw.yourcompany.cgmbridge.core.platform.BugReportExporter
+import tw.yourcompany.cgmbridge.core.prefs.AppPrefs
 import tw.yourcompany.cgmbridge.core.prefs.MultiSourceSettings
 import tw.yourcompany.cgmbridge.core.source.SourceIdentity
 import tw.yourcompany.cgmbridge.core.source.TransportType
 import tw.yourcompany.cgmbridge.databinding.ActivitySettingsMenuBinding
 import tw.yourcompany.cgmbridge.feature.alarm.AlarmSettingsActivity
+import tw.yourcompany.cgmbridge.feature.calibration.CalibrationDialogHelper
 
 /**
  * Settings menu screen.
@@ -33,6 +35,8 @@ class SettingsMenuActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivitySettingsMenuBinding
     private lateinit var multiSourceSettings: MultiSourceSettings
+    /** Shared preferences used by the calibration tool dialog. */
+    private lateinit var prefs: AppPrefs
 
     private val saveReportLauncher = registerForActivityResult(
         ActivityResultContracts.CreateDocument("application/zip")
@@ -49,6 +53,7 @@ class SettingsMenuActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivitySettingsMenuBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        prefs = AppPrefs(this)
         multiSourceSettings = MultiSourceSettings(this)
 
         setupBottomNav()
@@ -162,7 +167,15 @@ class SettingsMenuActivity : AppCompatActivity() {
         }
     }
 
-    /** Wires the bottom navigation for the settings screen. */
+    /**
+     * Wires the bottom navigation for the settings screen.
+     *
+     * User-experience rule:
+     * the five bottom-navigation buttons should behave like parallel entry points, so switching to
+     * Settings must not silently downgrade the Tool button into a placeholder action. Reusing the
+     * same calibration dialog helper as MainActivity keeps the Tool button consistent across screens
+     * without adding a new navigation destination or background state.
+     */
     private fun setupBottomNav() {
         binding.bottomNav.btnNavGraph.setOnClickListener { finish() }
         binding.bottomNav.btnNavStatistics.setOnClickListener {
@@ -172,7 +185,7 @@ class SettingsMenuActivity : AppCompatActivity() {
             Toast.makeText(this, getString(R.string.future_work), Toast.LENGTH_SHORT).show()
         }
         binding.bottomNav.btnNavTools.setOnClickListener {
-            Toast.makeText(this, getString(R.string.future_work), Toast.LENGTH_SHORT).show()
+            CalibrationDialogHelper.showCalibrationMenu(this, prefs)
         }
     }
 

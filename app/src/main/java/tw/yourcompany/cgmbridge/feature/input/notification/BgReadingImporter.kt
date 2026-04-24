@@ -1,5 +1,6 @@
 package tw.yourcompany.cgmbridge.feature.input.notification
 
+import tw.yourcompany.cgmbridge.core.constants.CoreConstants
 import tw.yourcompany.cgmbridge.core.data.Repository
 import tw.yourcompany.cgmbridge.core.db.BgReadingEntity
 import tw.yourcompany.cgmbridge.core.model.GlucoseSample
@@ -99,7 +100,7 @@ class BgReadingImporter(
     private fun normalizeVendor(sample: GlucoseSample): String {
         val direct = sample.vendorName.trim().lowercase()
         return when {
-            direct in setOf("aidex", "ottai", "dexcom") -> direct
+            CoreConstants.CGM_VENDORS.contains(direct) -> direct
             sample.originKey?.startsWith("com.") == true -> SupportedPackages.vendorForPackage(sample.originKey.orEmpty())
             else -> direct.ifBlank { "unknown" }
         }

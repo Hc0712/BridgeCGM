@@ -11,6 +11,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import tw.yourcompany.cgmbridge.R
+import tw.yourcompany.cgmbridge.core.constants.CoreConstants
 import tw.yourcompany.cgmbridge.core.platform.BugReportExporter
 import tw.yourcompany.cgmbridge.core.prefs.AppPrefs
 import tw.yourcompany.cgmbridge.core.prefs.MultiSourceSettings
@@ -86,27 +87,87 @@ class SettingsMenuActivity : AppCompatActivity() {
      * a new layout or activity.
      */
     private fun showPrimaryInputDialog() {
-        val vendors = arrayOf("aidex", "ottai", "dexcom")
-        val protocols = arrayOf("notification", "bluetooth", "WIFI", "NightScout")
-        val current = currentSelectionState(vendors, protocols)
+        val vendors = CoreConstants.CGM_VENDORS
+        val protocols = arrayOf(
+            "Notification", "Bluetooth", "WIFI", "NightScout", "Apple Health", "Health Connect"
+        )
+        val current = currentSelectionState(
+            vendors,
+            arrayOf("notification", "bluetooth", "wifi", "nightscout", "apple health", "health connect")
+        )
         var vendorIndex = current.first
         var protocolIndex = current.second
 
-        AlertDialog.Builder(this)
-            .setTitle("Select Vendor")
-            .setSingleChoiceItems(vendors, vendorIndex) { _, which -> vendorIndex = which }
+        // Build custom view with two RadioGroups
+        val layout = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(48, 32, 48, 16)
+        }
+
+        val vendorTitle = android.widget.TextView(this).apply {
+            text = getString(R.string.select_cgm_vendor)
+            textSize = 18f
+            setPadding(0, 0, 0, 8)
+        }
+        layout.addView(vendorTitle)
+
+        val vendorGroup = android.widget.RadioGroup(this).apply {
+            orientation = android.widget.RadioGroup.VERTICAL
+        }
+        vendors.forEachIndexed { i, v ->
+            val btn = android.widget.RadioButton(this).apply {
+                text = v.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+                isChecked = i == vendorIndex
+                id = 1000 + i // assign unique id
+            }
+            vendorGroup.addView(btn)
+        }
+        // Ensure only one vendor can be selected at a time
+        vendorGroup.setOnCheckedChangeListener { _, checkedId ->
+            vendorIndex = checkedId - 1000
+        }
+        layout.addView(vendorGroup)
+
+        val protocolTitle = android.widget.TextView(this).apply {
+            text = getString(R.string.select_protocol)
+            textSize = 18f
+            setPadding(0, 24, 0, 8)
+        }
+        layout.addView(protocolTitle)
+
+        val protocolGroup = android.widget.RadioGroup(this).apply {
+            orientation = android.widget.RadioGroup.VERTICAL
+        }
+        protocols.forEachIndexed { i, p ->
+            val btn = android.widget.RadioButton(this).apply {
+                text = p
+                isChecked = i == protocolIndex
+                isEnabled = i == 0 // Only Notification is enabled
+                id = 2000 + i // assign unique id
+            }
+            protocolGroup.addView(btn)
+        }
+        protocolGroup.setOnCheckedChangeListener { _, checkedId ->
+            val idx = checkedId - 2000
+            if (idx in protocols.indices && protocolGroup.getChildAt(idx).isEnabled) {
+                protocolIndex = idx
+            }
+        }
+        layout.addView(protocolGroup)
+
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Select Input")
+            .setView(layout)
             .setPositiveButton(android.R.string.ok) { _, _ ->
-                AlertDialog.Builder(this)
-                    .setTitle("Select Protocol")
-                    .setSingleChoiceItems(protocols, protocolIndex) { _, which -> protocolIndex = which }
-                    .setPositiveButton(android.R.string.ok) { _, _ ->
-                        savePrimaryInput(vendors[vendorIndex], protocols[protocolIndex])
-                    }
-                    .setNegativeButton(android.R.string.cancel, null)
-                    .show()
+                savePrimaryInput(
+                    vendors[vendorIndex],
+                    protocols[protocolIndex].lowercase().replace(" ", "")
+                )
             }
             .setNegativeButton(android.R.string.cancel, null)
-            .show()
+            .create()
+
+        dialog.show()
     }
 
     /**

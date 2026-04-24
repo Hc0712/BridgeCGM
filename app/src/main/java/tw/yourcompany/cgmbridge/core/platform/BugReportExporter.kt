@@ -43,8 +43,11 @@ object BugReportExporter {
                 writeText(zip, "threads.txt", dumpThreads())
                 writeText(zip, "prefs.json", dumpPrefs(context))
                 writeText(zip, "memory.txt", dumpMemory(context))
-                writeText(zip, "event_log.csv", dumpEventLogCsv(context))
-                writeText(zip, "bg_reading.csv", dumpBgReadingCsv(context))
+                // Await suspend functions properly
+                val eventLogCsv = dumpEventLogCsv(context)
+                writeText(zip, "event_log.csv", eventLogCsv)
+                val bgReadingCsv = dumpBgReadingCsv(context)
+                writeText(zip, "bg_reading.csv", bgReadingCsv)
                 writeText(zip, "system_info.txt", dumpSystemInfo(context))
                 val logcat = try { dumpLogcat() } catch (_: Throwable) { null }
                 if (logcat != null) {
@@ -205,10 +208,20 @@ object BugReportExporter {
         // Network info
         try {
             val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
-            val active = cm?.activeNetworkInfo
-            if (active != null) {
-                sb.appendLine("Network type: ${active.typeName}")
-                sb.appendLine("Network connected: ${active.isConnected}")
+            if (cm != null) {
+                val network = cm.activeNetwork
+                val nc = cm.getNetworkCapabilities(network)
+                val type = when {
+                    nc == null -> "none"
+                    nc.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) -> "WIFI"
+                    nc.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) -> "CELLULAR"
+                    nc.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET) -> "ETHERNET"
+                    nc.hasTransport(android.net.NetworkCapabilities.TRANSPORT_BLUETOOTH) -> "BLUETOOTH"
+                    else -> "OTHER"
+                }
+                val connected = nc != null
+                sb.appendLine("Network type: $type")
+                sb.appendLine("Network connected: $connected")
             }
         } catch (_: Throwable) {}
         // Storage info
@@ -227,7 +240,7 @@ object BugReportExporter {
         return try {
             val process = Runtime.getRuntime().exec(arrayOf("logcat", "-d", "-v", "time", "--pid", android.os.Process.myPid().toString()))
             process.inputStream.bufferedReader().use { it.readText() }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // If logcat is restricted, return null to skip
             null
         }

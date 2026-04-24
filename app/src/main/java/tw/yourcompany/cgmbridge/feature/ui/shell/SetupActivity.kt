@@ -3,13 +3,8 @@ package tw.yourcompany.cgmbridge.feature.ui.shell
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
-import android.util.TypedValue
-import android.view.ViewGroup
-import android.widget.Button
-import android.widget.LinearLayout
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import tw.yourcompany.cgmbridge.R
 import tw.yourcompany.cgmbridge.core.logging.DebugCategory
 import tw.yourcompany.cgmbridge.core.logging.DebugTrace
 import tw.yourcompany.cgmbridge.core.platform.BatteryOptimizationHelper
@@ -61,6 +56,7 @@ class SetupActivity : AppCompatActivity() {
         binding.radioHost.isChecked = prefs.role == "host"
         binding.radioReceiver.isChecked = prefs.role == "receiver"
 
+
         binding.btnNotificationAccess.setOnClickListener {
             startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
         }
@@ -69,7 +65,9 @@ class SetupActivity : AppCompatActivity() {
             startActivity(BatteryOptimizationHelper.buildIgnoreOptimizationsIntent(this))
         }
 
-        addEnableNotificationButtonIfNeeded()
+        binding.btnEnableNotification.setOnClickListener {
+            AlarmNotificationPermissionHelper.showEnableNotificationDialog(this)
+        }
 
         binding.btnOk.setOnClickListener {
             // Keep the original battery-optimization warning because the watchdog and listener
@@ -97,63 +95,6 @@ class SetupActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Inserts the new “Enable notification” button beside the existing permission buttons.
-     *
-     * Why this is done in code instead of XML:
-     * - the uploaded task asked for a source-only patch zip;
-     * - the existing setup layout content was not part of the editable context here;
-     * - cloning the existing button style from code keeps the UI close to the current screen.
-     *
-     * The method is defensive:
-     * - if the parent container cannot be resolved as a [ViewGroup], the app simply skips the
-     *   extra button instead of crashing;
-     * - the new button copies layout params from the battery button so spacing remains consistent.
-     */
-    private fun addEnableNotificationButtonIfNeeded() {
-        val parent = binding.btnBatteryOptimization.parent as? ViewGroup ?: return
-
-        val enableNotificationButton = Button(this).apply {
-            text = getString(R.string.open_alarm_notification_enable)
-            isAllCaps = binding.btnBatteryOptimization.isAllCaps
-            // Copy the original button text size directly in PX to avoid the deprecated
-            // DisplayMetrics.scaledDensity field while preserving the same rendered size.
-            setTextSize(TypedValue.COMPLEX_UNIT_PX, binding.btnBatteryOptimization.textSize)
-            setOnClickListener {
-                AlarmNotificationPermissionHelper.showEnableNotificationDialog(this@SetupActivity)
-            }
-        }
-
-        binding.btnBatteryOptimization.background?.constantState?.newDrawable()?.mutate()?.let {
-            enableNotificationButton.background = it
-        }
-        enableNotificationButton.setTextColor(binding.btnBatteryOptimization.currentTextColor)
-
-        enableNotificationButton.layoutParams = cloneLayoutParams(binding.btnBatteryOptimization.layoutParams)
-
-        val insertIndex = parent.indexOfChild(binding.btnBatteryOptimization) + 1
-        if (insertIndex in 1..parent.childCount) {
-            parent.addView(enableNotificationButton, insertIndex)
-        } else {
-            parent.addView(enableNotificationButton)
-        }
-    }
-
-    /**
-     * Creates a safe copy of the original button layout params.
-     *
-     * Android view parents require the correct concrete LayoutParams subclass. Reusing the original
-     * instance directly can fail because one view cannot own the same LayoutParams object as
-     * another view. This helper preserves margins and width/height semantics while avoiding that
-     * reuse bug.
-     */
-    private fun cloneLayoutParams(source: ViewGroup.LayoutParams): ViewGroup.LayoutParams {
-        return when (source) {
-            is LinearLayout.LayoutParams -> LinearLayout.LayoutParams(source)
-            is ViewGroup.MarginLayoutParams -> ViewGroup.MarginLayoutParams(source)
-            else -> ViewGroup.LayoutParams(source)
-        }
-    }
 
     /** Refresh button-related diagnostics after the user returns from system settings screens. */
     override fun onResume() {

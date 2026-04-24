@@ -62,7 +62,7 @@
     <string name="calibration_shift_number_only">Please enter a valid number for Shift.</string>
     <string name="calibration_over_range">Over Range +30 / -30</string>
     <string name="calibration_notice_line1">確保校正時血糖維持平穩至少15分鐘(水平箭頭)，按OK後即在圖表畫出校正數值</string>
-    <string name="calibration_notice_line2">本APP限制只能校正約 +30% ~ -30%誤差，禁止更大校正以避免使用者使用過度不良CGM，建議檢查CGM效期及其儲存運輸狀況</string>
+    <string name="calibration_notice_line2" formatted="false">本APP限制只能校正約 +30% ~ -30%誤差，禁止更大校正以避免使用者使用過度不良CGM，建議檢查CGM效期及其儲存運輸狀況</string>
     <string name="calibration_notice_input_setting">需至Set. -> INPUT SETTING 設定後才能校正\n更換CGM需自行重設此設定!!!</string>
     <string name="legend_calibrated_data">Calibrated Data</string>
     <string name="legend_raw_data">Raw Data</string>

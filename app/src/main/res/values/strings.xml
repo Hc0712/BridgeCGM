@@ -1,4 +1,9 @@
 <resources>
+    <!-- Reminder setting menu with right arrow for input controls (no longer used, but kept for reference) -->
+    <!-- <string name="alarm_high_threshold_arrow">%1$s  &gt;</string> -->
+    <!-- <string name="alarm_reminder_method_arrow">%1$s: %2$s  &gt;</string> -->
+    <!-- <string name="alarm_reminder_interval_arrow">%1$s: %2$s  &gt;</string> -->
+    <!-- <string name="alarm_alert_duration_arrow">%1$s: %2$s  &gt;</string> -->
     <string name="select_cgm_vendor">Select CGM Vendor</string>
     <string name="select_protocol">Select Protocol</string>
     <string name="app_name">BridgeCGM</string>
@@ -107,4 +112,5 @@
     <string name="alarm_notification_action_snooze">Snooze</string>
     <string name="alarm_notification_action_setting">Setting</string>
     
+<!-- ...existing code... -->
 </resources>

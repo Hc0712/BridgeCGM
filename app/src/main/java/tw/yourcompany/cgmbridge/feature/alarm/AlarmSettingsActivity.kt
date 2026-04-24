@@ -3,7 +3,6 @@ package tw.yourcompany.cgmbridge.feature.alarm
 import android.os.Bundle
 import android.text.InputType
 import android.view.ViewGroup
-import android.view.View
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -34,6 +33,10 @@ import kotlin.math.min
  *   persisted configuration for the edited alert group.
  */
 class AlarmSettingsActivity : AppCompatActivity() {
+    override fun onPause() {
+        super.onPause()
+        saveAllSettings()
+    }
 
     /** Persistent app settings wrapper used by the Reminder screen. */
     private lateinit var prefs: AppPrefs
@@ -50,15 +53,45 @@ class AlarmSettingsActivity : AppCompatActivity() {
     /** UI holder for the Urgent Low alert section. */
     private lateinit var urgentSection: AlarmSectionViews
 
+    // Temporary (unsaved) settings for all fields
+    private var tempAlarmHighEnabled: Boolean = false
+    private var tempAlarmLowEnabled: Boolean = false
+    private var tempAlarmUrgentLowEnabled: Boolean = false
+    private var tempDHighBlood: Double = 0.0
+    private var tempDLowBlood: Double = 0.0
+    private var tempDUrgentLowBlood: Double = 0.0
+    private var tempAlarmHighIntervalMin: Int = 0
+    private var tempAlarmLowIntervalMin: Int = 0
+    private var tempAlarmUrgentLowIntervalMin: Int = 0
+    private var tempAlarmHighDurationSec: Int = 0
+    private var tempAlarmLowDurationSec: Int = 0
+    private var tempAlarmUrgentLowDurationSec: Int = 0
+    private var tempAlarmHighMethod: String = ""
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         prefs = AppPrefs(this)
+
+        // Initialize temp values from prefs
+        tempAlarmHighEnabled = prefs.alarmHighEnabled
+        tempAlarmLowEnabled = prefs.alarmLowEnabled
+        tempAlarmUrgentLowEnabled = prefs.alarmUrgentLowEnabled
+        tempDHighBlood = prefs.dHighBlood
+        tempDLowBlood = prefs.dLowBlood
+        tempDUrgentLowBlood = prefs.dUrgentLowBlood
+        tempAlarmHighIntervalMin = prefs.alarmHighIntervalMin
+        tempAlarmLowIntervalMin = prefs.alarmLowIntervalMin
+        tempAlarmUrgentLowIntervalMin = prefs.alarmUrgentLowIntervalMin
+        tempAlarmHighDurationSec = prefs.alarmHighDurationSec
+        tempAlarmLowDurationSec = prefs.alarmLowDurationSec
+        tempAlarmUrgentLowDurationSec = prefs.alarmUrgentLowDurationSec
+        tempAlarmHighMethod = prefs.alarmHighMethod
 
         buildScreen()
         refreshAllSections()
 
         onBackPressedDispatcher.addCallback(this) {
-            finish()
+            saveAllSettingsAndExit()
         }
     }
 
@@ -86,11 +119,39 @@ class AlarmSettingsActivity : AppCompatActivity() {
         )
         setContentView(scrollView)
 
+
+        // Top row: title + enlarged ">" button, aligned with other arrows/switches
+        val rightWidgetWidth = (56 * density).toInt() // Use same width as other rows
+        val titleRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding(0, outerPadding, 0, outerPadding)
+        }
         val title = TextView(this).apply {
             text = getString(R.string.reminder_settings_title)
             textSize = 22f
         }
-        contentContainer.addView(title)
+        val saveButton = TextView(this).apply {
+            text = "<"
+            textSize = 28f // Enlarge the top arrow
+            gravity = android.view.Gravity.CENTER
+            setPadding((12 * density).toInt(), (6 * density).toInt(), (12 * density).toInt(), (6 * density).toInt())
+            setOnClickListener {
+                saveAllSettingsAndExit()
+            }
+            // Make it look like a button: rounded corners and background
+            background = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+                cornerRadius = 18 * density
+                setColor(0xFFE0E0E0.toInt()) // light gray background
+                setStroke((1 * density).toInt(), 0xFF888888.toInt()) // gray border
+            }
+        }
+        val titleParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        val saveParams = LinearLayout.LayoutParams(rightWidgetWidth, ViewGroup.LayoutParams.WRAP_CONTENT)
+        titleRow.addView(title, titleParams)
+        titleRow.addView(saveButton, saveParams)
+        contentContainer.addView(titleRow)
 
         highSection = addAlarmSection(
             title = getString(R.string.alarm_high_title),
@@ -164,22 +225,33 @@ class AlarmSettingsActivity : AppCompatActivity() {
         }
         contentContainer.addView(container, layoutParams)
 
+        // Consistent width for right-side widgets (switch and arrows)
+        val density = resources.displayMetrics.density
+        val rightWidgetWidth = (56 * density).toInt() // 56dp for switch/arrow alignment
+
+        // Title row with title (left) and switch (right)
+        val titleRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, rowPadding, 0, rowPadding)
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
         val titleView = TextView(this).apply {
             text = title
             textSize = 18f
         }
-        container.addView(titleView)
-
         val enabledSwitch = SwitchCompat(this).apply {
-            setPadding(0, rowPadding, 0, rowPadding)
             setOnCheckedChangeListener { _, isChecked -> onToggle(isChecked) }
         }
-        container.addView(enabledSwitch)
+        val titleViewParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        val switchParams = LinearLayout.LayoutParams(rightWidgetWidth, ViewGroup.LayoutParams.WRAP_CONTENT)
+        titleRow.addView(titleView, titleViewParams)
+        titleRow.addView(enabledSwitch, switchParams)
+        container.addView(titleRow)
 
-        val thresholdView = createActionTextView(container, rowPadding, onEditThreshold)
-        val methodView = createActionTextView(container, rowPadding, onEditMethod)
-        val intervalView = createActionTextView(container, rowPadding, onEditInterval)
-        val durationView = createActionTextView(container, rowPadding, onEditDuration)
+        val (thresholdView, thresholdRow) = createActionRow(container, rowPadding, onEditThreshold)
+        val (methodView, methodRow) = createActionRow(container, rowPadding, onEditMethod)
+        val (intervalView, intervalRow) = createActionRow(container, rowPadding, onEditInterval)
+        val (durationView, durationRow) = createActionRow(container, rowPadding, onEditDuration)
 
         return AlarmSectionViews(
             container = container,
@@ -192,20 +264,43 @@ class AlarmSettingsActivity : AppCompatActivity() {
     }
 
     /**
-     * Creates one tap-to-edit text row used by the dynamic Reminder settings UI.
+     * Creates a horizontal row with a label/value TextView (left, weight=1) and a right-aligned arrow TextView.
+     * Returns a pair: (labelView, rowLayout).
      */
-    private fun createActionTextView(
+    private fun createActionRow(
         parent: LinearLayout,
         rowPadding: Int,
         onClick: () -> Unit
-    ): TextView {
-        val textView = TextView(this).apply {
-            textSize = 16f
+    ): Pair<TextView, LinearLayout> {
+        val density = resources.displayMetrics.density
+        val rightWidgetWidth = (56 * density).toInt() // 56dp for switch/arrow alignment
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
             setPadding(0, rowPadding, 0, rowPadding)
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+            isClickable = true
+            isFocusable = true
+            setBackgroundResource(android.R.drawable.list_selector_background)
             setOnClickListener { onClick() }
         }
-        parent.addView(textView)
-        return textView
+        val labelView = TextView(this).apply {
+            textSize = 16f
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        val arrowView = TextView(this).apply {
+            text = ">"
+            textSize = 16f
+            layoutParams = LinearLayout.LayoutParams(rightWidgetWidth, ViewGroup.LayoutParams.WRAP_CONTENT)
+            gravity = android.view.Gravity.END or android.view.Gravity.CENTER_VERTICAL
+        }
+        row.addView(labelView)
+        row.addView(arrowView)
+        parent.addView(row)
+        return Pair(labelView, row)
     }
 
     /** Refreshes every alert section after any alarm value changes. */
@@ -223,28 +318,22 @@ class AlarmSettingsActivity : AppCompatActivity() {
         val section = sectionFor(kind)
         val enabled = isEnabled(kind)
         section.enabledSwitch.setOnCheckedChangeListener(null)
-        section.enabledSwitch.text = if (enabled) "Enabled" else "Disabled"
         section.enabledSwitch.isChecked = enabled
         section.enabledSwitch.setOnCheckedChangeListener { _, isChecked ->
             when (kind) {
-                AlarmKind.HIGH -> prefs.alarmHighEnabled = isChecked
-                AlarmKind.LOW -> prefs.alarmLowEnabled = isChecked
-                AlarmKind.URGENT_LOW -> prefs.alarmUrgentLowEnabled = isChecked
+                AlarmKind.HIGH -> tempAlarmHighEnabled = isChecked
+                AlarmKind.LOW -> tempAlarmLowEnabled = isChecked
+                AlarmKind.URGENT_LOW -> tempAlarmUrgentLowEnabled = isChecked
             }
             refreshSection(kind)
             playPreviewFor(kind)
         }
 
+        // Set only the label/value text, not the arrow, for each row
         section.thresholdView.text = getThresholdLabel(kind)
-        section.methodView.text = getString(
-            R.string.alarm_reminder_method
-        ) + ": " + getString(R.string.alarm_sound_label)
-        section.intervalView.text = getString(
-            R.string.alarm_reminder_interval
-        ) + ": " + getString(R.string.alarm_minutes_suffix, intervalMinutes(kind))
-        section.durationView.text = getString(
-            R.string.alarm_alert_duration
-        ) + ": " + getString(R.string.alarm_seconds_suffix, durationSeconds(kind))
+        section.methodView.text = getString(R.string.alarm_reminder_method) + ": " + getString(R.string.alarm_sound_label)
+        section.intervalView.text = getString(R.string.alarm_reminder_interval) + ": " + getString(R.string.alarm_minutes_suffix, intervalMinutes(kind))
+        section.durationView.text = getString(R.string.alarm_alert_duration) + ": " + getString(R.string.alarm_seconds_suffix, durationSeconds(kind))
     }
 
     /** Returns the correct UI holder for one alert kind. */
@@ -256,56 +345,56 @@ class AlarmSettingsActivity : AppCompatActivity() {
 
     /** Returns the persisted enabled state for one alert kind. */
     private fun isEnabled(kind: AlarmKind): Boolean = when (kind) {
-        AlarmKind.HIGH -> prefs.alarmHighEnabled
-        AlarmKind.LOW -> prefs.alarmLowEnabled
-        AlarmKind.URGENT_LOW -> prefs.alarmUrgentLowEnabled
+        AlarmKind.HIGH -> tempAlarmHighEnabled
+        AlarmKind.LOW -> tempAlarmLowEnabled
+        AlarmKind.URGENT_LOW -> tempAlarmUrgentLowEnabled
     }
 
     /** Returns the persisted threshold in mg/dL for one alert kind. */
     private fun thresholdMgdl(kind: AlarmKind): Double = when (kind) {
-        AlarmKind.HIGH -> prefs.dHighBlood
-        AlarmKind.LOW -> prefs.dLowBlood
-        AlarmKind.URGENT_LOW -> prefs.dUrgentLowBlood
+        AlarmKind.HIGH -> tempDHighBlood
+        AlarmKind.LOW -> tempDLowBlood
+        AlarmKind.URGENT_LOW -> tempDUrgentLowBlood
     }
 
     /** Persists one threshold value in mg/dL after validation succeeds. */
     private fun saveThresholdMgdl(kind: AlarmKind, valueMgdl: Double) {
         when (kind) {
-            AlarmKind.HIGH -> prefs.dHighBlood = valueMgdl
-            AlarmKind.LOW -> prefs.dLowBlood = valueMgdl
-            AlarmKind.URGENT_LOW -> prefs.dUrgentLowBlood = valueMgdl
+            AlarmKind.HIGH -> tempDHighBlood = valueMgdl
+            AlarmKind.LOW -> tempDLowBlood = valueMgdl
+            AlarmKind.URGENT_LOW -> tempDUrgentLowBlood = valueMgdl
         }
     }
 
     /** Returns the persisted reminder interval in minutes for one alert kind. */
     private fun intervalMinutes(kind: AlarmKind): Int = when (kind) {
-        AlarmKind.HIGH -> prefs.alarmHighIntervalMin
-        AlarmKind.LOW -> prefs.alarmLowIntervalMin
-        AlarmKind.URGENT_LOW -> prefs.alarmUrgentLowIntervalMin
+        AlarmKind.HIGH -> tempAlarmHighIntervalMin
+        AlarmKind.LOW -> tempAlarmLowIntervalMin
+        AlarmKind.URGENT_LOW -> tempAlarmUrgentLowIntervalMin
     }
 
     /** Persists the reminder interval for one alert kind. */
     private fun saveIntervalMinutes(kind: AlarmKind, value: Int) {
         when (kind) {
-            AlarmKind.HIGH -> prefs.alarmHighIntervalMin = value
-            AlarmKind.LOW -> prefs.alarmLowIntervalMin = value
-            AlarmKind.URGENT_LOW -> prefs.alarmUrgentLowIntervalMin = value
+            AlarmKind.HIGH -> tempAlarmHighIntervalMin = value
+            AlarmKind.LOW -> tempAlarmLowIntervalMin = value
+            AlarmKind.URGENT_LOW -> tempAlarmUrgentLowIntervalMin = value
         }
     }
 
     /** Returns the persisted alert duration in seconds for one alert kind. */
     private fun durationSeconds(kind: AlarmKind): Int = when (kind) {
-        AlarmKind.HIGH -> prefs.alarmHighDurationSec
-        AlarmKind.LOW -> prefs.alarmLowDurationSec
-        AlarmKind.URGENT_LOW -> prefs.alarmUrgentLowDurationSec
+        AlarmKind.HIGH -> tempAlarmHighDurationSec
+        AlarmKind.LOW -> tempAlarmLowDurationSec
+        AlarmKind.URGENT_LOW -> tempAlarmUrgentLowDurationSec
     }
 
     /** Persists the alert duration for one alert kind. */
     private fun saveDurationSeconds(kind: AlarmKind, value: Int) {
         when (kind) {
-            AlarmKind.HIGH -> prefs.alarmHighDurationSec = value
-            AlarmKind.LOW -> prefs.alarmLowDurationSec = value
-            AlarmKind.URGENT_LOW -> prefs.alarmUrgentLowDurationSec = value
+            AlarmKind.HIGH -> tempAlarmHighDurationSec = value
+            AlarmKind.LOW -> tempAlarmLowDurationSec = value
+            AlarmKind.URGENT_LOW -> tempAlarmUrgentLowDurationSec = value
         }
     }
 
@@ -380,7 +469,7 @@ class AlarmSettingsActivity : AppCompatActivity() {
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(android.R.string.ok) { _, _ ->
                 when (kind) {
-                    AlarmKind.HIGH -> prefs.alarmHighMethod = AlarmMethod.SOUND.wireValue
+                    AlarmKind.HIGH -> tempAlarmHighMethod = AlarmMethod.SOUND.wireValue
                     AlarmKind.LOW -> { /* Low and urgent-low only support sound in current prefs */ }
                     AlarmKind.URGENT_LOW -> { /* Low and urgent-low only support sound in current prefs */ }
                 }
@@ -440,7 +529,7 @@ class AlarmSettingsActivity : AppCompatActivity() {
             return
         }
         val method = when (kind) {
-            AlarmKind.HIGH -> prefs.alarmHighMethod
+            AlarmKind.HIGH -> tempAlarmHighMethod
             AlarmKind.LOW -> AlarmMethod.SOUND.wireValue
             AlarmKind.URGENT_LOW -> AlarmMethod.SOUND.wireValue
         }
@@ -454,6 +543,34 @@ class AlarmSettingsActivity : AppCompatActivity() {
             AlarmKind.URGENT_LOW -> "urgent"
         }
         AlarmSoundPlayer.playByName(this, rawName, durationSeconds(kind))
+
+    }
+
+    /**
+     * Saves all staged settings to prefs.
+     */
+    private fun saveAllSettings() {
+        prefs.alarmHighEnabled = tempAlarmHighEnabled
+        prefs.alarmLowEnabled = tempAlarmLowEnabled
+        prefs.alarmUrgentLowEnabled = tempAlarmUrgentLowEnabled
+        prefs.dHighBlood = tempDHighBlood
+        prefs.dLowBlood = tempDLowBlood
+        prefs.dUrgentLowBlood = tempDUrgentLowBlood
+        prefs.alarmHighIntervalMin = tempAlarmHighIntervalMin
+        prefs.alarmLowIntervalMin = tempAlarmLowIntervalMin
+        prefs.alarmUrgentLowIntervalMin = tempAlarmUrgentLowIntervalMin
+        prefs.alarmHighDurationSec = tempAlarmHighDurationSec
+        prefs.alarmLowDurationSec = tempAlarmLowDurationSec
+        prefs.alarmUrgentLowDurationSec = tempAlarmUrgentLowDurationSec
+        prefs.alarmHighMethod = tempAlarmHighMethod
+    }
+
+    /**
+     * Saves all staged settings to prefs and exits the activity.
+     */
+    private fun saveAllSettingsAndExit() {
+        saveAllSettings()
+        finish()
     }
 
     /** Displays the project-provided invalid-range warning toast. */

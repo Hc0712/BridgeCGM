@@ -67,7 +67,7 @@ class MultiSourceReadingProcessor(
         val row = BgReadingEntity(
             sourceId = reading.sourceId,
             timestampMs = reading.timestampMs,
-            calculatedValueMgdl = reading.valueMgdl,
+            rawValueMgdl = reading.valueMgdl,
             calibratedValueMgdl = calibrated,
             direction = reading.direction,
             rawText = reading.rawText,

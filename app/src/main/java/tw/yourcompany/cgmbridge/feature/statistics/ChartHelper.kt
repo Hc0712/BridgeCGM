@@ -268,7 +268,7 @@ object ChartHelper {
         val dataSets = seriesList.map { series ->
             val entries = series.rows.map { row ->
                 val value =
-                    if (series.useCalibratedValue) row.calibratedValueMgdl else row.calculatedValueMgdl
+                    if (series.useCalibratedValue) row.calibratedValueMgdl else row.rawValueMgdl
                 val y = if (isMmol) value / MMOL_FACTOR.toFloat() else value.toFloat()
                 Entry(toXValue(row.timestampMs, dayStartMs), y).apply { data = row }
             }
@@ -371,7 +371,7 @@ object ChartHelper {
         val allValuesMgdl = buildList {
             list.forEach { row ->
                 add(row.calibratedValueMgdl.toDouble())
-                if (showCalibrationOverlay) add(row.calculatedValueMgdl.toDouble())
+                if (showCalibrationOverlay) add(row.rawValueMgdl.toDouble())
             }
         }
         val minMgdl = min(

@@ -246,7 +246,9 @@ class SettingsMenuActivity : AppCompatActivity() {
             Toast.makeText(this, getString(R.string.future_work), Toast.LENGTH_SHORT).show()
         }
         binding.bottomNav.btnNavTools.setOnClickListener {
-            CalibrationDialogHelper.showCalibrationMenu(this, prefs)
+            // Settings screen does not keep a live latest-reading cache, so it opens the
+            // menu without a primary reading header value.
+            CalibrationDialogHelper.showCalibrationMenu(this, prefs, latestPrimaryReading = null)
         }
     }
 

@@ -183,10 +183,10 @@ object BugReportExporter {
         val db = AppDatabase.get(context)
         val rows = db.bgReadingDao().latestOnce(2000)
         val sb = StringBuilder()
-        sb.appendLine("timestampMs,calculatedValueMgdl,direction,sourcePackage,sensorStatus,alertText")
+        sb.appendLine("timestampMs,rawValueMgdl,direction,sourcePackage,sensorStatus,alertText")
         for (r in rows) {
             sb.append(r.timestampMs).append(',')
-            sb.append(r.calculatedValueMgdl).append(',')
+            sb.append(r.rawValueMgdl).append(',')
             sb.append(escapeCsv(r.direction)).append(',')
             sb.append(escapeCsv(r.sourcePackage)).append(',')
             sb.append(escapeCsv(r.sensorStatus ?: "")).append(',')

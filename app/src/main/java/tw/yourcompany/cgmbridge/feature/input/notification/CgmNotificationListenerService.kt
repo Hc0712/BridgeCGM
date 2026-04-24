@@ -289,14 +289,14 @@ class CgmNotificationListenerService : NotificationListenerService() {
                         repo.log(
                             "D",
                             "Importer",
-                            "Inserted BG ${result.entity.calculatedValueMgdl} " +
+                            "Inserted BG ${result.entity.rawValueMgdl} " +
                                 "notifDir=${sample.direction} slopeDir=${slopeResult.directionName} " +
                                 "from ${result.entity.sourcePackage}"
                         )
                         DebugTrace.v(DebugCategory.DATABASE, "INSERT-DETAIL") {
                             "[DATABASE] BgReadingEntity: " +
                             "timestampMs=${result.entity.timestampMs}, " +
-                            "calculatedValueMgdl=${result.entity.calculatedValueMgdl}, " +
+                            "rawValueMgdl=${result.entity.rawValueMgdl}, " +
                             "calibratedValueMgdl=${result.entity.calibratedValueMgdl}, " +
                             "direction=${result.entity.direction}, " +
                             "sourcePackage=${result.entity.sourcePackage}, " +

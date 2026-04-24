@@ -438,7 +438,14 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, getString(R.string.future_work), Toast.LENGTH_SHORT).show()
         }
         binding.bottomNav.btnNavTools.setOnClickListener {
-            CalibrationDialogHelper.showCalibrationMenu(this, prefs) { renderAll() }
+            // Pass the latest PRIMARY-input reading so the calibration menu can display
+            // the newest rawValueMgdl from that exact source on its first line.
+            val latestPrimaryReading = primarySourceId?.let { id ->
+                latestReadingsCache
+                    .filter { it.sourceId == id }
+                    .maxByOrNull { it.timestampMs }
+            }
+            CalibrationDialogHelper.showCalibrationMenu(this, prefs, latestPrimaryReading = latestPrimaryReading) { renderAll() }
         }
         binding.bottomNav.btnNavSettings.setOnClickListener {
             startActivity(Intent(this, SettingsMenuActivity::class.java))

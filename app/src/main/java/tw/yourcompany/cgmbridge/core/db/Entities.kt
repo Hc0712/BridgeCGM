@@ -62,7 +62,7 @@ data class BgReadingEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val sourceId: String,
     val timestampMs: Long,
-    val calculatedValueMgdl: Int,
+    val rawValueMgdl: Int,
     val calibratedValueMgdl: Int,
     val direction: String,
     val rawText: String,

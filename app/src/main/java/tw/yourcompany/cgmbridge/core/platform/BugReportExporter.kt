@@ -45,6 +45,11 @@ object BugReportExporter {
                 writeText(zip, "memory.txt", dumpMemory(context))
                 writeText(zip, "event_log.csv", dumpEventLogCsv(context))
                 writeText(zip, "bg_reading.csv", dumpBgReadingCsv(context))
+                writeText(zip, "system_info.txt", dumpSystemInfo(context))
+                val logcat = try { dumpLogcat() } catch (_: Throwable) { null }
+                if (logcat != null) {
+                    writeText(zip, "logcat.txt", logcat)
+                }
             }
         } ?: throw IllegalStateException("Cannot open output stream for selected location")
     }
@@ -185,6 +190,47 @@ object BugReportExporter {
             sb.append(escapeCsv(r.alertText ?: "")).append("\n")
         }
         return sb.toString()
+    }
+
+    private fun dumpSystemInfo(context: Context): String {
+        val sb = StringBuilder()
+        // Battery info
+        try {
+            val bm = context.getSystemService(Context.BATTERY_SERVICE) as? android.os.BatteryManager
+            if (bm != null) {
+                val level = bm.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY)
+                sb.appendLine("Battery level: $level%")
+            }
+        } catch (_: Throwable) {}
+        // Network info
+        try {
+            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+            val active = cm?.activeNetworkInfo
+            if (active != null) {
+                sb.appendLine("Network type: ${active.typeName}")
+                sb.appendLine("Network connected: ${active.isConnected}")
+            }
+        } catch (_: Throwable) {}
+        // Storage info
+        try {
+            val stat = android.os.StatFs(context.filesDir.absolutePath)
+            val bytesAvailable = stat.availableBytes
+            val bytesTotal = stat.totalBytes
+            sb.appendLine("Storage available: $bytesAvailable bytes")
+            sb.appendLine("Storage total: $bytesTotal bytes")
+        } catch (_: Throwable) {}
+        return sb.toString()
+    }
+
+    private fun dumpLogcat(): String? {
+        // Try to get logcat output for this process only
+        return try {
+            val process = Runtime.getRuntime().exec(arrayOf("logcat", "-d", "-v", "time", "--pid", android.os.Process.myPid().toString()))
+            process.inputStream.bufferedReader().use { it.readText() }
+        } catch (e: Exception) {
+            // If logcat is restricted, return null to skip
+            null
+        }
     }
 
     private fun escapeCsv(s: String): String {

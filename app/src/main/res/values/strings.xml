@@ -72,14 +72,14 @@
     <string name="settings_item_alarm">Alarm Setting</string>
     <string name="reminder_settings_title">Reminder settings</string>
     <string name="alarm_high_title">High blood glucose alert</string>
-    <string name="alarm_high_threshold">Threshold of high blood glucose alert</string>
+    <string name="alarm_high_threshold">Threshold of high</string>
     <string name="alarm_low_title">Low blood glucose alert</string>
-    <string name="alarm_low_threshold">Threshold of low blood glucose alert</string>
+    <string name="alarm_low_threshold">Threshold of low</string>
     <string name="alarm_reminder_method">Reminder method</string>
     <string name="alarm_reminder_interval">Reminder interval</string>
     <string name="alarm_alert_duration">Alert Duration</string>
     <string name="alarm_urgent_low_title">Urgent low blood glucose alert</string>
-    <string name="alarm_urgent_low_threshold">Threshold of urgent low blood glucose alert</string>
+    <string name="alarm_urgent_low_threshold">Threshold of urgent low</string>
     <string name="alarm_sound_label">Sound</string>
     <string name="alarm_minutes_suffix">%1$d minutes</string>
     <string name="alarm_seconds_suffix">%1$d Seconds</string>

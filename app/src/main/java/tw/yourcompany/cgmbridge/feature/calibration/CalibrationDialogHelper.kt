@@ -165,9 +165,8 @@ object CalibrationDialogHelper {
 
         // ===== Top line: latest raw glucose from PRIMARY input =====
         val latestRawHeader = TextView(activity).apply {
-            text = latestPrimaryReading?.rawValueMgdl?.let { "$it mg/dL" } ?: "-- mg/dL"
-            textSize = 18f
-            setTypeface(typeface, Typeface.BOLD)
+            text = latestPrimaryReading?.rawValueMgdl?.let { "Raw blood glucose : $it mg/dL" } ?: "Raw blood glucose : -- mg/dL"
+            textSize = 14f
             gravity = Gravity.CENTER_HORIZONTAL
             setPadding(0, 0, 0, blockMargin)
         }

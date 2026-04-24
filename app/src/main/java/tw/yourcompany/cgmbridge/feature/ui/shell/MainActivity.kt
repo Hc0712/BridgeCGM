@@ -465,19 +465,22 @@ class MainActivity : AppCompatActivity() {
         val primarySource = sourcesCache.firstOrNull { it.sourceId == primarySourceId }
         val calibrationEnabled = prefs.calibrationEnabled
 
-        // Build label for primary input with bold prefix
-        val primaryLabel = if (primarySource != null) {
-            if (calibrationEnabled) {
+        if (primarySource != null) {
+            // Build label for primary input with bold prefix
+            val primaryLabel = if (calibrationEnabled) {
                 "${primarySource.vendorName} / ${primarySource.transportType.lowercase()} / Calibrated"
             } else {
                 "${primarySource.vendorName} / ${primarySource.transportType.lowercase()} / Raw"
             }
+            val primaryPrefix = "Primary Input : "
+            val primaryHtml = primaryPrefix + primaryLabel
+            binding.uiPrimaryInputStatus.text = android.text.Html.fromHtml(primaryHtml, android.text.Html.FROM_HTML_MODE_LEGACY)
         } else {
-            getString(R.string.no_primary_input)
+            // Show only the string without prefix if no primary input is selected
+            binding.uiPrimaryInputStatus.text = getString(R.string.no_primary_input)
         }
-        val primaryPrefix = "<b>Primary Input : </b>"
-        val primaryHtml = primaryPrefix + primaryLabel
-        binding.uiPrimaryInputStatus.text = android.text.Html.fromHtml(primaryHtml, android.text.Html.FROM_HTML_MODE_LEGACY)
+
+
 
         // Build labels for all other enabled and visible sources (excluding primary)
         val optionalSources = sourcesCache

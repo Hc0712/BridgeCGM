@@ -230,17 +230,17 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:orientation="vertical"
-        android:gravity="center"
+        android:gravity="start"
         android:background="#232323">
         <TextView
             android:id="@+id/uiPrimaryInputStatus"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Current Setting Line 1"
+            android:text=""
             android:textColor="#FFFFFF"
-            android:textSize="15sp"
+            android:textSize="12sp"
             android:textStyle="bold"
-            android:gravity="center" />
+            android:gravity="start" />
         <ScrollView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -251,10 +251,10 @@
                 android:id="@+id/uiOptionalInputStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Current Setting Line 2"
+                android:text=""
                 android:textColor="#CCCCCC"
-                android:textSize="13sp"
-                android:gravity="center" />
+                android:textSize="12sp"
+                android:gravity="start" />
         </ScrollView>
     </LinearLayout>
 

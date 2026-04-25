@@ -51,6 +51,7 @@
     <string name="settings_item_input">Input Setting</string>
     <string name="settings_item_output">Output Setting</string>
     <string name="settings_item_report_bug">Report Bug</string>
+    <string name="settings_item_about">About</string>
     <string name="settings_report_hint">Report Bug will save an App Diagnostics ZIP to your chosen location. This works for normal users.</string>
 
     <string name="future_work">Not implemented yet (future work).</string>

@@ -14,7 +14,7 @@ CGM 通知 → 解析血糖值 → 寫入 Room DB → 取最近兩筆 → 計算
                                                               xDrip+ 廣播
 ```
 
-核心元件位於 `tw.yourcompany.cgmbridge.parser` 套件：
+核心元件位於 `com.north7.bridgecgm.parser` 套件：
 
 | 類別 | 職責 |
 |------|------|

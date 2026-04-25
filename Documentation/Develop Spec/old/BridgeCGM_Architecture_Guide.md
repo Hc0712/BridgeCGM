@@ -58,7 +58,7 @@ Think of the software as five cooperating machines:
 # 2. Refactored Package Layout
 
 ```text
-tw.yourcompany.cgmbridge
+applicationId = "com.north7.bridgecgm"
 ├─ core
 │  ├─ model
 │  ├─ data

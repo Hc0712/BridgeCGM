@@ -12,7 +12,7 @@ plugins {
 }
 
 android {
-    namespace = "tw.yourcompany.cgmbridge"
+    namespace = "com.north7.bridgecgm"
     compileSdk = 34
 
     // ── Read feature flags from gradle.properties ──
@@ -44,7 +44,7 @@ android {
     val (debugAlarmD, debugAlarmR) = flag("debugAlarm", true, false)
 
     defaultConfig {
-        applicationId = "tw.yourcompany.cgmbridge"
+        applicationId = "com.north7.bridgecgm"
         minSdk = 24
         targetSdk = 34
         versionCode = 4

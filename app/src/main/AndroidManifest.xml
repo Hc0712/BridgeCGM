@@ -54,7 +54,9 @@
             android:name=".feature.ui.shell.SetupActivity"
             android:exported="false" />
 
-        
+        <activity
+            android:name=".feature.ui.shell.AboutActivity"
+            android:exported="false" />
 <activity
     android:name=".feature.alarm.AlarmSettingsActivity"
     android:exported="false"

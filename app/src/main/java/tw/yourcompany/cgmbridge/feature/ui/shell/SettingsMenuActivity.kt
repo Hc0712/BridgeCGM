@@ -75,6 +75,9 @@ class SettingsMenuActivity : AppCompatActivity() {
         binding.menuReportBug.setOnClickListener {
             saveReportLauncher.launch(BugReportExporter.defaultFileName())
         }
+        binding.menuAbout.setOnClickListener {
+            startActivity(Intent(this, AboutActivity::class.java))
+        }
     }
 
     /**

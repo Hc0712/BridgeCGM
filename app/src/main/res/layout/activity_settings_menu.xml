@@ -75,14 +75,14 @@
                 android:text="@string/settings_item_alarm" />
 
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/menuReportBug"
+                android:id="@+id/menuAbout"
                 style="@style/Widget.MaterialComponents.Button"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="28dp"
                 android:layout_marginTop="16dp"
                 android:layout_marginEnd="28dp"
-                android:text="@string/settings_item_report_bug" />
+                android:text="About" />
 
             <ProgressBar
                 android:id="@+id/reportProgress"
@@ -100,6 +100,25 @@
                 android:layout_marginTop="10dp"
                 android:text="@string/settings_report_hint"
                 android:textColor="#777777"
+                android:textSize="12sp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/menuReportBug"
+                style="@style/Widget.MaterialComponents.Button"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="28dp"
+                android:layout_marginTop="16dp"
+                android:layout_marginEnd="28dp"
+                android:text="@string/settings_item_report_bug" />
+
+            <TextView
+                android:id="@+id/reportBugHint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="Report Bug will save an App Diangloists.....  for normal users."
+                android:textColor="#888888"
                 android:textSize="12sp" />
 
         </LinearLayout>

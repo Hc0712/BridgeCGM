@@ -27,7 +27,7 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
             android:layout_marginTop="12dp"
-            android:text="Ver. 0.2"
+            android:text="@string/about_version"
             android:textColor="#FFFFFF"
             android:textSize="18sp"
             android:textStyle="bold" />
@@ -53,4 +53,3 @@
             android:scrollbars="vertical" />
     </LinearLayout>
 </ScrollView>
-

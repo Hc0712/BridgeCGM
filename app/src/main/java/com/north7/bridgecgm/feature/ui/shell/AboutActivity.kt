@@ -1,7 +1,9 @@
 package com.north7.bridgecgm.feature.ui.shell
 
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
+import com.north7.bridgecgm.R
 import com.north7.bridgecgm.databinding.ActivityAboutBinding
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -14,8 +16,14 @@ class AboutActivity : AppCompatActivity() {
         binding = ActivityAboutBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Set version text (hardcoded as requested)
-        binding.appVersion.text = "Ver. 0.2"
+        // Get versionName from PackageManager
+        val versionName = try {
+            packageManager.getPackageInfo(packageName, 0).versionName ?: ""
+        } catch (e: PackageManager.NameNotFoundException) {
+            ""
+        }
+        // Set version text using string resource
+        binding.appVersion.text = getString(R.string.about_version, versionName)
 
         // Load license text from assets or raw resource
         binding.licenseText.text = loadLicenseText()
@@ -34,4 +42,3 @@ class AboutActivity : AppCompatActivity() {
         }
     }
 }
-

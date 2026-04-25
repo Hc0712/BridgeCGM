@@ -565,19 +565,48 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Updates the input status blocks below the main chart to show the current primary and optional input sources.
-     * The format matches the main graph legend: "Vendor / transport / Raw" or "Vendor / transport / Calibrated".
+     * Builds the compact user-facing status label for one input source.
+     *
+     * Why this helper exists:
+     * - `displayName` is a stable registry label, but it may include extra source-identity
+     *   fragments (for example an origin/default marker) that are useful internally and should
+     *   not be shown in the user-facing input-status block.
+     * - The product requirement for the status area is strictly:
+     *   "Vendor / transport / Raw" or "Vendor / transport / Calibrated".
+     *
+     * Behavior:
+     * - Prefer `vendorName` because it is the normalized concise vendor label used throughout
+     *   the multi-source pipeline.
+     * - If `vendorName` is blank for any unexpected reason, fall back to only the first visible
+     *   segment of `displayName` instead of exposing the full internal identity string.
+     */
+    private fun buildInputStatusLabel(source: CgmSourceEntity, calibrated: Boolean): String {
+        val vendor = source.vendorName
+            .trim()
+            .ifBlank { source.displayName.substringBefore(" /").trim() }
+
+        val dataKind = if (calibrated) "Calibrated" else "Raw"
+        return "$vendor / ${source.transportType.lowercase()} / $dataKind"
+    }
+
+    /**
+     * Updates the input status blocks below the main chart to show the current primary and
+     * optional input sources.
+     *
+     * Visible format:
+     * - Primary Input : Vendor / transport / Raw
+     * - Primary Input : Vendor / transport / Calibrated
+     * - Optional InputN : Vendor / transport / Raw
      */
     private fun updateInputStatusBlocks() {
         val primarySource = sourcesCache.firstOrNull { it.sourceId == primarySourceId }
         val calibrationEnabled = prefs.calibrationEnabled
 
         if (primarySource != null) {
-            val primaryLabel = if (calibrationEnabled) {
-                "${primarySource.displayName} / ${primarySource.transportType.lowercase()} / Calibrated"
-            } else {
-                "${primarySource.displayName} / ${primarySource.transportType.lowercase()} / Raw"
-            }
+            val primaryLabel = buildInputStatusLabel(
+                source = primarySource,
+                calibrated = calibrationEnabled
+            )
             val primaryPrefix = "Primary Input : "
             val primaryHtml = primaryPrefix + primaryLabel
             binding.uiPrimaryInputStatus.text =
@@ -593,7 +622,10 @@ class MainActivity : AppCompatActivity() {
             val optionalLines = mutableListOf<String>()
             optionalSources.forEachIndexed { idx, src ->
                 val prefix = "Optional Input${idx + 1} : "
-                val label = "${src.displayName} / ${src.transportType.lowercase()} / Raw"
+                val label = buildInputStatusLabel(
+                    source = src,
+                    calibrated = false
+                )
                 label.split("\n").forEach { line ->
                     optionalLines.add("$prefix${line.trim()}")
                 }

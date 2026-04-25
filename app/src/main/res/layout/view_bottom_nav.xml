@@ -1,13 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/bottomNavRoot"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
     android:background="#1A1A1A"
-    android:paddingVertical="6dp"
-    android:paddingHorizontal="6dp">
+    android:paddingTop="6dp"
+    android:paddingBottom="6dp"
+    android:paddingStart="6dp"
+    android:paddingEnd="6dp"
+    tools:targetApi="34">
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/btnNavGraph"
@@ -20,7 +24,7 @@
         android:textSize="12sp"
         android:textColor="#4CAF50"
         app:iconPadding="0dp"
-        android:backgroundTint="#232323"
+        app:backgroundTint="#232323"
         android:layout_marginStart="4dp"
         android:layout_marginEnd="4dp" />
 
@@ -35,7 +39,7 @@
         android:textSize="12sp"
         android:textColor="#888888"
         app:iconPadding="0dp"
-        android:backgroundTint="#232323"
+        app:backgroundTint="#232323"
         android:layout_marginStart="4dp"
         android:layout_marginEnd="4dp" />
 
@@ -50,7 +54,7 @@
         android:textSize="12sp"
         android:textColor="#888888"
         app:iconPadding="0dp"
-        android:backgroundTint="#232323"
+        app:backgroundTint="#232323"
         android:layout_marginStart="4dp"
         android:layout_marginEnd="4dp" />
 
@@ -65,7 +69,7 @@
         android:textSize="12sp"
         android:textColor="#888888"
         app:iconPadding="0dp"
-        android:backgroundTint="#232323"
+        app:backgroundTint="#232323"
         android:layout_marginStart="4dp"
         android:layout_marginEnd="4dp" />
 
@@ -80,7 +84,7 @@
         android:textSize="12sp"
         android:textColor="#888888"
         app:iconPadding="0dp"
-        android:backgroundTint="#232323"
+        app:backgroundTint="#232323"
         android:layout_marginStart="4dp"
         android:layout_marginEnd="4dp" />
 

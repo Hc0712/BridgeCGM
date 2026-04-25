@@ -1,16 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#212121"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    tools:context=".feature.ui.shell.MainActivity"
+    tools:targetApi="34">
 
     <!-- ════════ Top: BG Value + Arrow + Delta (ConstraintLayout) ════════ -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingHorizontal="16dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
         android:paddingTop="8dp">
 
         <!-- Minutes ago + delta (left-aligned, stacked) -->
@@ -84,78 +88,93 @@
             android:layout_height="wrap_content"
             android:gravity="center"
             android:orientation="horizontal"
-            android:paddingHorizontal="12dp">
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp">
 
-            <TextView
-                android:id="@+id/dateBtn0"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:paddingHorizontal="12dp"
-                android:paddingVertical="4dp"
-                android:text="Today"
-                android:textColor="#4CAF50"
-                android:textSize="13sp"
-                android:textStyle="bold" />
+        <TextView
+            android:id="@+id/dateBtn0"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:text="Today"
+            android:textColor="#4CAF50"
+            android:textSize="13sp"
+            android:textStyle="bold" />
 
-            <TextView
-                android:id="@+id/dateBtn1"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:paddingHorizontal="12dp"
-                android:paddingVertical="4dp"
-                android:text=""
-                android:textColor="#888888"
-                android:textSize="13sp" />
+        <TextView
+            android:id="@+id/dateBtn1"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:text=""
+            android:textColor="#888888"
+            android:textSize="13sp" />
 
-            <TextView
-                android:id="@+id/dateBtn2"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:paddingHorizontal="12dp"
-                android:paddingVertical="4dp"
-                android:text=""
-                android:textColor="#888888"
-                android:textSize="13sp" />
+        <TextView
+            android:id="@+id/dateBtn2"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:text=""
+            android:textColor="#888888"
+            android:textSize="13sp" />
 
-            <TextView
-                android:id="@+id/dateBtn3"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:paddingHorizontal="12dp"
-                android:paddingVertical="4dp"
-                android:text=""
-                android:textColor="#888888"
-                android:textSize="13sp" />
+        <TextView
+            android:id="@+id/dateBtn3"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:text=""
+            android:textColor="#888888"
+            android:textSize="13sp" />
 
-            <TextView
-                android:id="@+id/dateBtn4"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:paddingHorizontal="12dp"
-                android:paddingVertical="4dp"
-                android:text=""
-                android:textColor="#888888"
-                android:textSize="13sp" />
+        <TextView
+            android:id="@+id/dateBtn4"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:text=""
+            android:textColor="#888888"
+            android:textSize="13sp" />
 
-            <TextView
-                android:id="@+id/dateBtn5"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:paddingHorizontal="12dp"
-                android:paddingVertical="4dp"
-                android:text=""
-                android:textColor="#888888"
-                android:textSize="13sp" />
+        <TextView
+            android:id="@+id/dateBtn5"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:text=""
+            android:textColor="#888888"
+            android:textSize="13sp" />
 
-            <TextView
-                android:id="@+id/dateBtn6"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:paddingHorizontal="12dp"
-                android:paddingVertical="4dp"
-                android:text=""
-                android:textColor="#888888"
-                android:textSize="13sp" />
+        <TextView
+            android:id="@+id/dateBtn6"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:text=""
+            android:textColor="#888888"
+            android:textSize="13sp" />
         </LinearLayout>
     </HorizontalScrollView>
 
@@ -165,14 +184,17 @@
         android:layout_height="wrap_content"
         android:gravity="center"
         android:orientation="horizontal"
-        android:paddingVertical="4dp">
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp">
 
         <TextView
             android:id="@+id/chip3h"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:paddingHorizontal="16dp"
-            android:paddingVertical="6dp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
             android:text="3h"
             android:textColor="#888888"
             android:textSize="14sp" />
@@ -181,8 +203,10 @@
             android:id="@+id/chip6h"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:paddingHorizontal="16dp"
-            android:paddingVertical="6dp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
             android:text="6h"
             android:textColor="#888888"
             android:textSize="14sp" />
@@ -191,8 +215,10 @@
             android:id="@+id/chip12h"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:paddingHorizontal="16dp"
-            android:paddingVertical="6dp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
             android:text="12h"
             android:textColor="#888888"
             android:textSize="14sp" />
@@ -201,8 +227,10 @@
             android:id="@+id/chip24h"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:paddingHorizontal="16dp"
-            android:paddingVertical="6dp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
             android:text="24h"
             android:textColor="#4CAF50"
             android:textSize="14sp"
@@ -300,7 +328,8 @@
                         android:layout_height="wrap_content"
                         android:text="@string/stat_sd_label"
                         android:textColor="#888888"
-                        android:textSize="12sp" />
+                        android:textSize="12sp"
+                        tools:ignore="UselessParent" />
 
                     <TextView
                         android:id="@+id/statSdValueText"
@@ -330,7 +359,8 @@
                         android:layout_height="wrap_content"
                         android:text="@string/stat_cv_label"
                         android:textColor="#888888"
-                        android:textSize="12sp" />
+                        android:textSize="12sp"
+                        tools:ignore="UselessParent" />
 
                     <TextView
                         android:id="@+id/statCvValueText"
@@ -364,7 +394,8 @@
                         android:layout_height="wrap_content"
                         android:text="@string/stat_min_label"
                         android:textColor="#888888"
-                        android:textSize="12sp" />
+                        android:textSize="12sp"
+                        tools:ignore="UselessParent" />
 
                     <TextView
                         android:id="@+id/statMinValueText"
@@ -394,7 +425,8 @@
                         android:layout_height="wrap_content"
                         android:text="@string/stat_max_label"
                         android:textColor="#888888"
-                        android:textSize="12sp" />
+                        android:textSize="12sp"
+                        tools:ignore="UselessParent" />
 
                     <TextView
                         android:id="@+id/statMaxValueText"
@@ -429,7 +461,8 @@
                         android:layout_height="wrap_content"
                         android:text="@string/stat_hba1c_est_label"
                         android:textColor="#888888"
-                        android:textSize="12sp" />
+                        android:textSize="12sp"
+                        tools:ignore="UselessParent" />
 
                     <TextView
                         android:id="@+id/statHba1cValueText"
@@ -461,7 +494,8 @@
                         android:maxLines="3"
                         android:text="@string/stat_range_label_placeholder"
                         android:textColor="#888888"
-                        android:textSize="12sp" />
+                        android:textSize="12sp"
+                        tools:ignore="UselessParent" />
 
                     <TextView
                         android:id="@+id/statRangeValueText"

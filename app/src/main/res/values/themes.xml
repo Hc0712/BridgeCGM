@@ -1,5 +1,5 @@
 <resources>
-    <style name="Theme.CgmBridge" parent="Theme.Material3.DayNight.NoActionBar">
+    <style name="Theme.CgmBridge" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="android:statusBarColor">@color/bg_screen</item>
         <item name="android:windowBackground">@color/bg_screen</item>
         <item name="android:navigationBarColor">@android:color/black</item>

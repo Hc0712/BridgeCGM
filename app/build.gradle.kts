@@ -1,3 +1,16 @@
+import java.io.ByteArrayOutputStream
+
+// Get the number of Git tags for versionCode
+val gitTagCount = try {
+    val stdout = ByteArrayOutputStream()
+    exec {
+        commandLine = listOf("git", "tag", "--list")
+        standardOutput = stdout
+    }
+    stdout.toString().lines().filter { it.isNotBlank() }.count()
+} catch (e: Exception) {
+    1 // fallback if git is not available
+}
 /**
  * Application module build file.
  *
@@ -47,8 +60,8 @@ android {
         applicationId = "com.north7.bridgecgm"
         minSdk = 24
         targetSdk = 34
-        versionCode = 4
-        versionName = "0.4.0"
+        versionCode = gitTagCount
+        versionName = "0.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
     }

@@ -9,10 +9,13 @@ package tw.yourcompany.cgmbridge.feature.ui.shell
 import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Bundle
+import android.view.MotionEvent
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import com.github.mikephil.charting.listener.ChartTouchListener
+import com.github.mikephil.charting.listener.OnChartGestureListener
 import tw.yourcompany.cgmbridge.R
 import tw.yourcompany.cgmbridge.core.db.BgReadingEntity
 import tw.yourcompany.cgmbridge.core.db.CgmSourceEntity
@@ -112,6 +115,7 @@ class MainActivity : AppCompatActivity() {
 
         ChartHelper.initDetail(binding.glucoseChartDetail, currentOutputUnit)
         ChartHelper.initOverview(binding.glucoseChartOverview, currentOutputUnit)
+        installDetailChartViewportSync()
 
         setupBottomNav()
         markSelectedTab(isGraph = true)
@@ -341,6 +345,70 @@ class MainActivity : AppCompatActivity() {
             prefs.dHighBlood,
             lowAlarmLabel,
             highAlarmLabel
+        )
+        syncOverviewWindowEdges()
+    }
+
+    /**
+     * Installs the gesture listener that keeps the mini graph window-edge markers synchronized
+     * with user-driven zoom and pan operations on the main graph.
+     *
+     * Existing responsibility split is preserved:
+     * - the detail chart remains the only interactive chart;
+     * - the overview chart remains read-only;
+     * - MainActivity only forwards viewport changes to ChartHelper, which already owns the chart
+     *   coordinate system and rendering details.
+     */
+    private fun installDetailChartViewportSync() {
+        binding.glucoseChartDetail.onChartGestureListener = object : OnChartGestureListener {
+            override fun onChartGestureStart(
+                me: MotionEvent?,
+                lastPerformedGesture: ChartTouchListener.ChartGesture?
+            ) = Unit
+
+            override fun onChartGestureEnd(
+                me: MotionEvent?,
+                lastPerformedGesture: ChartTouchListener.ChartGesture?
+            ) {
+                syncOverviewWindowEdges()
+            }
+
+            override fun onChartLongPressed(me: MotionEvent?) = Unit
+
+            override fun onChartDoubleTapped(me: MotionEvent?) = Unit
+
+            override fun onChartSingleTapped(me: MotionEvent?) = Unit
+
+            override fun onChartFling(
+                me1: MotionEvent?,
+                me2: MotionEvent?,
+                velocityX: Float,
+                velocityY: Float
+            ) = Unit
+
+            override fun onChartScale(me: MotionEvent?, scaleX: Float, scaleY: Float) {
+                syncOverviewWindowEdges()
+            }
+
+            override fun onChartTranslate(me: MotionEvent?, dX: Float, dY: Float) {
+                syncOverviewWindowEdges()
+            }
+        }
+    }
+
+    /**
+     * Pushes the current main-chart start/end viewport edges onto the mini graph.
+     *
+     * This method is called from two paths:
+     * - gesture callbacks, so finger zoom/pan updates the mini graph immediately;
+     * - renderOverview(), so chip-based resets and data-driven re-renders also refresh the two
+     *   vertical overview lines.
+     */
+    private fun syncOverviewWindowEdges() {
+        ChartHelper.syncOverviewViewportWindow(
+            detailChart = binding.glucoseChartDetail,
+            overviewChart = binding.glucoseChartOverview,
+            dayStartMs = vm.dayStartMs()
         )
     }
 

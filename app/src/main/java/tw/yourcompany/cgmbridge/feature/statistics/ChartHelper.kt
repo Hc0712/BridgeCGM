@@ -40,6 +40,9 @@ object ChartHelper {
     private const val LIMIT_LINE_WIDTH = 1.0f
     private const val LIMIT_LINE_TEXT_SIZE = 8f
     private const val HIGHLIGHT_LINE_WIDTH = 0.8f
+    private const val WINDOW_EDGE_LINE_WIDTH = 1.1f
+    private const val WINDOW_EDGE_TEXT_SIZE = 7f
+    private const val WINDOW_EDGE_COLOR = 0xAA80CBC4.toInt()
     private const val MMOL_FACTOR =
         tw.yourcompany.cgmbridge.core.constants.GlucoseConstants.MMOL_FACTOR
     private const val DEFAULT_MIN_MGDL =
@@ -408,6 +411,102 @@ object ChartHelper {
  * The method is intentionally one-shot. It resets the current transform once, but it does not
  * disable future manual zooming or panning by the user.
  */
+    /**
+     * Synchronizes the mini graph with the currently visible viewport of the main graph.
+     *
+     * Why this helper lives in ChartHelper instead of MainActivity:
+     * - the x-values for both charts are already normalized here as minutes since the selected
+     *   day start, so this layer can translate viewport edges into stable overview x positions
+     *   without changing the existing activity/view-model responsibilities;
+     * - the overview chart needs only two extra X-axis limit lines, which is a very small,
+     *   low-risk extension of the existing chart rendering logic.
+     *
+     * Behavior:
+     * - whenever the main chart viewport changes, two vertical lines are drawn on the mini graph
+     *   at the visible start and visible end positions of the main chart;
+     * - each line is labeled with the corresponding time edge so users can read the main-graph
+     *   start/end directly from the mini graph;
+     * - when either chart has no data, the indicator lines are removed to avoid stale markers.
+     */
+    fun syncOverviewViewportWindow(
+        detailChart: LineChart,
+        overviewChart: LineChart,
+        dayStartMs: Long
+    ) {
+        val overviewData = overviewChart.data
+        val detailData = detailChart.data
+        val xAxis = overviewChart.xAxis
+        xAxis.removeAllLimitLines()
+
+        if (overviewData == null || overviewData.dataSetCount == 0 ||
+            detailData == null || detailData.dataSetCount == 0) {
+            overviewChart.invalidate()
+            return
+        }
+
+        val axisMin = xAxis.axisMinimum
+        val axisMax = xAxis.axisMaximum
+        val visibleStart = detailChart.lowestVisibleX.coerceIn(axisMin, axisMax)
+        val visibleEnd = detailChart.highestVisibleX.coerceIn(axisMin, axisMax)
+
+        if (!visibleStart.isFinite() || !visibleEnd.isFinite() || visibleEnd < visibleStart) {
+            overviewChart.invalidate()
+            return
+        }
+
+        xAxis.addLimitLine(
+            buildOverviewViewportEdgeLine(
+                xValue = visibleStart,
+                label = formatOverviewViewportEdgeLabel(visibleStart, dayStartMs),
+                isStartEdge = true
+            )
+        )
+        xAxis.addLimitLine(
+            buildOverviewViewportEdgeLine(
+                xValue = visibleEnd,
+                label = formatOverviewViewportEdgeLabel(visibleEnd, dayStartMs),
+                isStartEdge = false
+            )
+        )
+        overviewChart.invalidate()
+    }
+
+    /**
+     * Creates one vertical edge indicator for the mini graph.
+     *
+     * The two labels use opposite horizontal anchors so short windows (for example 00:00–03:00)
+     * still show both time strings without immediately overlapping each other.
+     */
+    private fun buildOverviewViewportEdgeLine(
+        xValue: Float,
+        label: String,
+        isStartEdge: Boolean
+    ): LimitLine = LimitLine(xValue, label).apply {
+        lineColor = WINDOW_EDGE_COLOR
+        lineWidth = WINDOW_EDGE_LINE_WIDTH
+        textColor = WINDOW_EDGE_COLOR
+        textSize = WINDOW_EDGE_TEXT_SIZE
+        labelPosition = if (isStartEdge) {
+            LimitLine.LimitLabelPosition.RIGHT_TOP
+        } else {
+            LimitLine.LimitLabelPosition.LEFT_TOP
+        }
+    }
+
+    /**
+     * Formats one mini-graph edge label from the normalized x-axis value.
+     *
+     * The overview chart spans exactly one selected day. When the viewport reaches the far-right
+     * edge we prefer the human-readable "24:00" label instead of wrapping back to the next day's
+     * "00:00", because the user is looking at the end of the current day window.
+     */
+    private fun formatOverviewViewportEdgeLabel(xValue: Float, dayStartMs: Long): String {
+        val clamped = xValue.coerceIn(0f, (24 * 60).toFloat())
+        if (clamped >= (24 * 60).toFloat() - 0.001f) return "24:00"
+        val timestampMs = (clamped.toDouble() * MS_PER_MIN + dayStartMs).toLong()
+        return SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(timestampMs))
+    }
+
 private fun resetDetailViewportToDefaultTimeWindow(
     chart: LineChart,
     dayStartMs: Long,

@@ -62,6 +62,16 @@ class MainActivity : AppCompatActivity() {
     private var currentWindowHours: Int = 24
     private var currentDateOffset: Int = 0
 
+    /**
+     * One-shot flag requesting the detail chart to discard any user zoom/pan and return to the
+     * chip-selected default time window.
+     *
+     * The flag is raised only when the user taps a 3h / 6h / 12h / 24h chip. The next detail-chart
+     * render consumes it and then clears it immediately so live data updates do not keep fighting
+     * with manual chart interaction after the reset has already happened once.
+     */
+    private var pendingDetailChartWindowReset: Boolean = true
+
     /** Date button views (index 0 = today, 6 = 6 days ago). */
     private lateinit var dateButtons: List<TextView>
 
@@ -112,10 +122,10 @@ class MainActivity : AppCompatActivity() {
         )
         setupDateButtons()
 
-        binding.chip3h.setOnClickListener { vm.observe3h(); currentWindowHours = 3; updateChipState(3) }
-        binding.chip6h.setOnClickListener { vm.observe6h(); currentWindowHours = 6; updateChipState(6) }
-        binding.chip12h.setOnClickListener { vm.observe12h(); currentWindowHours = 12; updateChipState(12) }
-        binding.chip24h.setOnClickListener { vm.observe24h(); currentWindowHours = 24; updateChipState(24) }
+        binding.chip3h.setOnClickListener { selectTimeWindow(3) }
+        binding.chip6h.setOnClickListener { selectTimeWindow(6) }
+        binding.chip12h.setOnClickListener { selectTimeWindow(12) }
+        binding.chip24h.setOnClickListener { selectTimeWindow(24) }
         updateChipState(24)
 
         if (NotificationAccessChecker.isNotificationAccessGranted(this)) {
@@ -190,7 +200,6 @@ class MainActivity : AppCompatActivity() {
 
     /**
      * Registers all LiveData observers used by the main screen.
-     *
      * We observe readings and source metadata separately because the graph needs both pieces:
      * readings provide values and timestamps, while the source registry provides color / label /
      * visibility information.
@@ -223,11 +232,10 @@ class MainActivity : AppCompatActivity() {
 
     /**
      * Chooses the row that should drive the large top BG value.
-     *
      * Rule:
-     * - if a primary source is selected and that source has rows in the current list, use the
-     *   latest row from that source;
-     * - otherwise, fall back to the latest row across all sources.
+     * if a primary source is selected and that source has rows in the current list, use the
+     * latest row from that source;
+     * otherwise, fall back to the latest row across all sources.
      */
     private fun latestForDisplay(list: List<BgReadingEntity>): BgReadingEntity? {
         val primaryRows = primarySourceId?.let { id -> list.filter { it.sourceId == id } }.orEmpty()
@@ -237,7 +245,6 @@ class MainActivity : AppCompatActivity() {
 
     /**
      * Renders the latest glucose value, direction arrow, minutes ago, and 5-minute delta.
-     *
      * The slope is calculated from the same source-specific subset that drives the displayed top
      * value, preventing a non-primary source from influencing the arrow shown for the primary one.
      */
@@ -279,11 +286,13 @@ class MainActivity : AppCompatActivity() {
         binding.minutesAgoText.text = if (slope.minutesAgo <= 0) "Just now" else "${slope.minutesAgo} min ago"
 
         if (!slope.isValid || slope.deltaPerFiveMin.isNaN()) {
-            binding.deltaText.text = "Delta: ???"
+            binding.deltaText.text = ""
         } else if (currentOutputUnit == "mmol") {
-            binding.deltaText.text = String.format(Locale.US, "Delta: %+.2f mmol/L per 5-min", slope.deltaPerFiveMin / 18.0)
+            binding.deltaText.text =
+                String.format(Locale.US, "Delta: %+.2f mmol/L per 5-min", slope.deltaPerFiveMin / 18.0)
         } else {
-            binding.deltaText.text = String.format(Locale.US, "Delta: %+.1f mg/dL per 5-min", slope.deltaPerFiveMin)
+            binding.deltaText.text =
+                String.format(Locale.US, "Delta: %+.1f mg/dL per 5-min", slope.deltaPerFiveMin)
         }
     }
 
@@ -292,6 +301,7 @@ class MainActivity : AppCompatActivity() {
      */
     private fun renderDetailChart(list: List<BgReadingEntity>) {
         val (lowAlarmLabel, highAlarmLabel) = getAlarmLabels(forMainGraph = true)
+        val shouldResetToChipWindow = pendingDetailChartWindowReset
         ChartHelper.renderDetail(
             binding.glucoseChartDetail,
             list,
@@ -305,8 +315,10 @@ class MainActivity : AppCompatActivity() {
             prefs.dLowBlood,
             prefs.dHighBlood,
             lowAlarmLabel,
-            highAlarmLabel
+            highAlarmLabel,
+            shouldResetToChipWindow
         )
+        pendingDetailChartWindowReset = false
     }
 
     /**
@@ -377,8 +389,8 @@ class MainActivity : AppCompatActivity() {
         if (stats == null) {
             binding.statSdValueText.text = "--"
             binding.statCvValueText.text = "--"
-            binding.statMinValueText.text = "--"
             binding.statMaxValueText.text = "--"
+            binding.statMinValueText.text = "--"
             binding.statHba1cValueText.text = "--"
             binding.statRangeValueText.text = "--"
             return
@@ -427,6 +439,27 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
+     * Handles a user tap on one of the main-graph time chips.
+     *
+     * The existing responsibility split stays unchanged:
+     * - MainViewModel still owns the logical Room query window.
+     * - MainActivity still owns chip highlighting and view-state wiring.
+     * - ChartHelper receives a one-shot reset flag so it can restore the chart viewport to the
+     *   default chip-selected time scale after the next render.
+     */
+    private fun selectTimeWindow(hours: Int) {
+        when (hours) {
+            3 -> vm.observe3h()
+            6 -> vm.observe6h()
+            12 -> vm.observe12h()
+            else -> vm.observe24h()
+        }
+        currentWindowHours = hours
+        pendingDetailChartWindowReset = true
+        updateChipState(hours)
+    }
+
+    /**
      * Wires the bottom navigation actions used by this screen.
      */
     private fun setupBottomNav() {
@@ -438,14 +471,14 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, getString(R.string.future_work), Toast.LENGTH_SHORT).show()
         }
         binding.bottomNav.btnNavTools.setOnClickListener {
-            // Pass the latest PRIMARY-input reading so the calibration menu can display
-            // the newest rawValueMgdl from that exact source on its first line.
             val latestPrimaryReading = primarySourceId?.let { id ->
                 latestReadingsCache
                     .filter { it.sourceId == id }
                     .maxByOrNull { it.timestampMs }
             }
-            CalibrationDialogHelper.showCalibrationMenu(this, prefs, latestPrimaryReading = latestPrimaryReading) { renderAll() }
+            CalibrationDialogHelper.showCalibrationMenu(this, prefs, latestPrimaryReading = latestPrimaryReading) {
+                renderAll()
+            }
         }
         binding.bottomNav.btnNavSettings.setOnClickListener {
             startActivity(Intent(this, SettingsMenuActivity::class.java))
@@ -468,43 +501,38 @@ class MainActivity : AppCompatActivity() {
      * The format matches the main graph legend: "Vendor / transport / Raw" or "Vendor / transport / Calibrated".
      */
     private fun updateInputStatusBlocks() {
-        // Find the primary source
         val primarySource = sourcesCache.firstOrNull { it.sourceId == primarySourceId }
         val calibrationEnabled = prefs.calibrationEnabled
 
         if (primarySource != null) {
-            // Build label for primary input with bold prefix
             val primaryLabel = if (calibrationEnabled) {
-                "${primarySource.vendorName} / ${primarySource.transportType.lowercase()} / Calibrated"
+                "${primarySource.displayName} / ${primarySource.transportType.lowercase()} / Calibrated"
             } else {
-                "${primarySource.vendorName} / ${primarySource.transportType.lowercase()} / Raw"
+                "${primarySource.displayName} / ${primarySource.transportType.lowercase()} / Raw"
             }
             val primaryPrefix = "Primary Input : "
             val primaryHtml = primaryPrefix + primaryLabel
-            binding.uiPrimaryInputStatus.text = android.text.Html.fromHtml(primaryHtml, android.text.Html.FROM_HTML_MODE_LEGACY)
+            binding.uiPrimaryInputStatus.text =
+                android.text.Html.fromHtml(primaryHtml, android.text.Html.FROM_HTML_MODE_LEGACY)
         } else {
-            // Show only the string without prefix if no primary input is selected
             binding.uiPrimaryInputStatus.text = getString(R.string.no_primary_input)
         }
 
-
-
-        // Build labels for all other enabled and visible sources (excluding primary)
         val optionalSources = sourcesCache
             .filter { it.enabled && it.visibleOnMainGraph && it.sourceId != primarySourceId }
 
         if (optionalSources.isNotEmpty()) {
             val optionalLines = mutableListOf<String>()
             optionalSources.forEachIndexed { idx, src ->
-                val prefix = "<b>Optional Input${idx + 1} : </b>"
-                val label = "${src.vendorName} / ${src.transportType.lowercase()} / Raw"
-                // If label contains newlines, add prefix to each line
+                val prefix = "Optional Input${idx + 1} : "
+                val label = "${src.displayName} / ${src.transportType.lowercase()} / Raw"
                 label.split("\n").forEach { line ->
                     optionalLines.add("$prefix${line.trim()}")
                 }
             }
             val html = optionalLines.joinToString("<br>")
-            binding.uiOptionalInputStatus.text = android.text.Html.fromHtml(html, android.text.Html.FROM_HTML_MODE_LEGACY)
+            binding.uiOptionalInputStatus.text =
+                android.text.Html.fromHtml(html, android.text.Html.FROM_HTML_MODE_LEGACY)
         } else {
             binding.uiOptionalInputStatus.text = getString(R.string.no_optional_inputs)
         }

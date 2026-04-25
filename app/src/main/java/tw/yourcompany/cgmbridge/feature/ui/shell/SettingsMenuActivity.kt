@@ -87,7 +87,7 @@ class SettingsMenuActivity : AppCompatActivity() {
      * a new layout or activity.
      */
     private fun showPrimaryInputDialog() {
-        val vendors = CoreConstants.CGM_VENDORS
+        val vendors: Array<String> = CoreConstants.CGM_VENDORS
         val protocols = arrayOf(
             "Notification", "Bluetooth", "WIFI", "NightScout", "Apple Health", "Health Connect"
         )
@@ -114,7 +114,7 @@ class SettingsMenuActivity : AppCompatActivity() {
         val vendorGroup = android.widget.RadioGroup(this).apply {
             orientation = android.widget.RadioGroup.VERTICAL
         }
-        vendors.forEachIndexed { i, v ->
+        vendors.forEachIndexed { i: Int, v: String ->
             val btn = android.widget.RadioButton(this).apply {
                 text = v.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
                 isChecked = i == vendorIndex
@@ -138,7 +138,7 @@ class SettingsMenuActivity : AppCompatActivity() {
         val protocolGroup = android.widget.RadioGroup(this).apply {
             orientation = android.widget.RadioGroup.VERTICAL
         }
-        protocols.forEachIndexed { i, p ->
+        protocols.forEachIndexed { i: Int, p: String ->
             val btn = android.widget.RadioButton(this).apply {
                 text = p
                 isChecked = i == protocolIndex

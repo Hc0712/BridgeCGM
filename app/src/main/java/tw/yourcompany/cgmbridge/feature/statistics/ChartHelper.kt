@@ -157,7 +157,8 @@ object ChartHelper {
         lowThresholdMgdl: Double,
         highThresholdMgdl: Double,
         lowAlarmLabel: String,
-        highAlarmLabel: String
+        highAlarmLabel: String,
+        resetToDefaultTimeWindow: Boolean = false
     ) {
         configureXAxisDetail(chart, dayStartMs, timeWindowHours, isToday)
         val series = MultiSourceChartSupport.buildMainGraphSeries(
@@ -183,6 +184,9 @@ object ChartHelper {
             lowAlarmLabel,
             highAlarmLabel
         )
+        if (resetToDefaultTimeWindow) {
+            resetDetailViewportToDefaultTimeWindow(chart, dayStartMs, timeWindowHours, isToday)
+        }
     }
 
     /**
@@ -388,6 +392,55 @@ object ChartHelper {
         chart.axisRight.axisMaximum = axisMax
         applyThresholdLimitLines(chart.axisRight, outputUnit, lowThresholdMgdl, highThresholdMgdl, lowAlarmLabel, highAlarmLabel)
     }
+
+
+
+/**
+ * Restores the detail-chart viewport to the default chip-selected time window after the user
+ * has previously pinch-zoomed or panned the graph.
+ *
+ * Behavior rules implemented here:
+ * - Today: show the latest N hours ending at the current time, clamped to the selected day's
+ *   midnight. Example: at 03:00, tapping 3h restores 00:00 -> 03:00.
+ * - Past days: show the final N hours of the selected day, matching the existing query logic in
+ *   MainViewModel.
+ *
+ * The method is intentionally one-shot. It resets the current transform once, but it does not
+ * disable future manual zooming or panning by the user.
+ */
+private fun resetDetailViewportToDefaultTimeWindow(
+    chart: LineChart,
+    dayStartMs: Long,
+    timeWindowHours: Int,
+    isToday: Boolean
+) {
+    val totalDayMinutes = (24 * 60).toFloat()
+    val requestedMinutes = (timeWindowHours.coerceIn(1, 24) * 60).toFloat()
+    val visibleMinutes = requestedMinutes.coerceAtMost(totalDayMinutes)
+
+    // Drop any previous pinch-zoom / drag transform first so the chip tap becomes a true reset.
+    chart.fitScreen()
+
+    val endMinutes = if (isToday) {
+        ((System.currentTimeMillis() - dayStartMs).coerceIn(0L, 24L * HOUR_MS)).toFloat() /
+            MS_PER_MIN.toFloat()
+    } else {
+        totalDayMinutes
+    }
+    val startMinutes = (endMinutes - visibleMinutes).coerceAtLeast(0f)
+    val fullSpanMinutes = (chart.xAxis.axisMaximum - chart.xAxis.axisMinimum)
+        .takeIf { it > 0f }
+        ?: totalDayMinutes
+
+    if (visibleMinutes < fullSpanMinutes) {
+        val scaleX = (fullSpanMinutes / visibleMinutes).coerceAtLeast(1f)
+        chart.zoom(scaleX, 1f, 0f, 0f)
+    }
+
+    chart.moveViewToX(startMinutes)
+    chart.highlightValues(null)
+    chart.invalidate()
+}
 
     /**
      * Configures the main-chart x-axis.

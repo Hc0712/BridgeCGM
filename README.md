@@ -4,6 +4,9 @@ BridgeCGM 通知讀取 → xDrip+ 640G/EverSense 廣播橋接 App。
 
 支援 AiDEX、OTTAI、Dexcom (Not yet verified) 三款 CGM。
 
+如果同時有兩個以上CGM在發訊息，主圖應能顯示出三條曲線，小圖只畫一條 Primary Input，
+如果開啟校正，則顯示條校正過的Primary Input
+
 ---
 
 ## 功能簡介

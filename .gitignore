@@ -31,4 +31,11 @@ replay_pid*
 .gradle/
 .idea/
 
+# personal data
 local.properties
+.env*
+
+# Key Store
+*.jks 
+*.keystore
+
